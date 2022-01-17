@@ -125,7 +125,7 @@ class Layer:
 # %%
 
 class PC_Net:
-    def __init__(self, network_dim, inf_rates, inference_steps=10,
+    def __init__(self, network_dim, inf_rates, inference_steps=5,
                  lr=0.01):  # defining network architecture and parameters
         self.lr = lr  # learning rate of weight updates
         self.inf_steps = inference_steps  # num of inference steps per input before weight update
@@ -150,14 +150,14 @@ class PC_Net:
                 layer.r_activation = np.full(layer.size, 0.1)
                 layer()
 
-    def __call__(self, inputs, training=False):
+    def __call__(self, inputs, inf_steps=10):
         # initialise network
         self.layers[0].r_activation = self.layers[0].r_output = inputs
 
         error_iter = []  # each element is the sum of activation of all error units per inference step
 
         # inference pass
-        for iter in range(self.inf_steps):
+        for iter in range(inf_steps):
             error_layer = []  # each element is sum of activation error in each layer
             for i in range(len(self.layers) - 1):  # iterate through non last layers
                 _layer = self.layers[i]
@@ -182,23 +182,23 @@ class PC_Net:
                 assert len(self.layers[i].r_activation) == self.layers[i].size
                 self.layers[i]()  # compute output given updated activation
 
-        if training:  # update weights
-            for i in range(len(self.layers) - 1):
-                _layer = self.layers[i]
-                delta = self.lr * (np.transpose([_layer.e_activation]) @ [
-                    self.layers[i + 1].r_output])  # making both 1d arrays nd to perform multiplication
-                assert np.shape(delta) == np.shape(_layer.weights)
-                _layer.weights = _layer.weights + delta
-
         total_error = np.sum(error_iter)  # total error per inference call
 
         return error_iter[-1]  # , total_error
 
-    def generate(self, inputs):  # given input generate predictions
+    def weight_update(self):  # update weights
+        for i in range(len(self.layers) - 1):
+            _layer = self.layers[i]
+            delta = self.lr * (np.transpose([_layer.e_activation]) @ [
+                self.layers[i + 1].r_output])  # making both 1d arrays nd to perform multiplication
+            assert np.shape(delta) == np.shape(_layer.weights)
+            _layer.weights = _layer.weights + delta
+
+    def generate(self, inputs, inf_steps_gen=50):  # given input generate predictions
         self.initialise_states()
         self.layers[0].r_activation = self.layers[0].r_output = inputs
 
-        error = self.__call__(inputs, training=False)  # infer given input
+        error = self.__call__(inputs, inf_steps=inf_steps_gen)  # infer given input
 
         self.layers[0].r_activation = self.layers[0].weights @ self.layers[1].r_output
 
@@ -221,10 +221,10 @@ class PC_Net:
 # instantiating network
 ##############################
 input_dim = dataWidth ** 2
-network_dimensions = [input_dim, 40, 30]  # input, hidden, output dimensions of network
+network_dimensions = [input_dim, 70, 30, 10]  # input, hidden, output dimensions of network
 inf_baserate = .1  # base inference rate
-inf_rates = [inf_baserate, inf_baserate/2, inf_baserate/3]  # ajustment rate of representations for each layer
-learningRate = 0.05
+inf_rates = [inf_baserate, inf_baserate/2, inf_baserate/3, inf_baserate/4]  # ajustment rate of representations for each layer
+learningRate = 0.025
 
 net = PC_Net(network_dimensions, inf_rates, lr=learningRate)
 
@@ -254,8 +254,8 @@ net = PC_Net(network_dimensions, inf_rates, lr=learningRate)
 # training loop
 #############################
 
-epochNum = 500
-repNum = 5  # num of times a sequence is repeated before moving to next sequence
+epochNum = 100
+repNum = 10  # num of times a sequence is repeated before moving to next sequence
 
 net.reset()
 avg_error = []
@@ -267,7 +267,8 @@ for epoch in range(epochNum):
         for rep in range(repNum):
             for frame in range(frameNum):
                 inputs = flat_data[seq, frame, :]
-                error_last = net(inputs, training=True)
+                error_last = net(inputs)
+                net.weight_update()
                 errors.append(error_last)
 
     avg_error.append(np.average(errors))
@@ -290,7 +291,7 @@ representation = []
 for seq in range(seqNum):
     for frame in range(frameNum):
         net_trained.initialise_states()
-        net_trained(flat_data[seq, frame, :], training=False)
+        net_trained(flat_data[seq, frame, :], inf_steps=100)
         representation.append(net_trained.layers[-1].r_output)
 
 pair_dist_euclidean = pairwise_distances(representation)  # euclidean distance of high level representations
@@ -299,23 +300,23 @@ pair_dist_cosine = pairwise_distances(representation, metric='cosine')  # cosine
 fig, axs = plt.subplots(1, 2)
 im1 = axs[0].imshow(pair_dist_euclidean)
 axs[0].set_title('euclidean')
-fig.colorbar(im1, ax = axs[0])
+fig.colorbar(im1, ax=axs[0])
 im2 = axs[1].imshow(pair_dist_cosine)
 axs[1].set_title('cosine')
-fig.colorbar(im2, ax = axs[1])
+fig.colorbar(im2, ax=axs[1])
 plt.show()
 
 # %%
 
 # generate test data for generative capacity
 testFrame = flat_data[np.random.randint(0, seqNum), np.random.randint(0, frameNum), :]
-testFrame[:21] = 0  # partially mask test frame
+# testFrame[:21] = 0  # partially mask test frame
 
 recoveredFrame, _ = net_trained.generate(testFrame)
 
 fig, (ax1, ax2) = plt.subplots(1, 2)
-ax1.imshow(np.reshape(testFrame, (7, 7)))
-ax2.imshow(np.reshape(recoveredFrame, (7, 7)))
+ax1.imshow(np.reshape(testFrame, (7, 7)), vmin=0, vmax=1)
+ax2.imshow(np.reshape(recoveredFrame, (7, 7)), vmin=0, vmax=1)
 plt.show()  # regeneration of image show average learning
 
 # %%

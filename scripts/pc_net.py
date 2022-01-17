@@ -8,6 +8,11 @@ import sklearn
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
+from scipy.spatial.distance import squareform, euclidean                        # transforms a 1D vector to symetircal matrix or a matrix to a 1D vector
+from sklearn.metrics import pairwise_distances                                  # computes the pairwise distance between observations
+from sklearn.linear_model import LinearRegression
+from sklearn.utils import shuffle
+
 # %%
 ####################################
 # data generation
@@ -199,7 +204,7 @@ class PC_Net:
 
         return self.layers[0].r_activation, error
 
-    def reset(self):
+    def reset(self):  # reset all activation and weights
         for layer in self.layers:
             layer.r_activation = np.zeros(layer.size)
             layer.r_output = np.zeros(layer.size)
@@ -216,11 +221,12 @@ class PC_Net:
 # instantiating network
 ##############################
 input_dim = dataWidth ** 2
-network_dimensions = [input_dim, 30, 20]  # input, hidden, output dimensions of network
+network_dimensions = [input_dim, 40, 30]  # input, hidden, output dimensions of network
 inf_baserate = .1  # base inference rate
 inf_rates = [inf_baserate, inf_baserate/2, inf_baserate/3]  # ajustment rate of representations for each layer
+learningRate = 0.05
 
-net = PC_Net(network_dimensions, inf_rates)
+net = PC_Net(network_dimensions, inf_rates, lr=learningRate)
 
 # %%
 
@@ -248,7 +254,7 @@ net = PC_Net(network_dimensions, inf_rates)
 # training loop
 #############################
 
-epochNum = 400
+epochNum = 500
 repNum = 5  # num of times a sequence is repeated before moving to next sequence
 
 net.reset()
@@ -257,9 +263,8 @@ avg_error = []
 for epoch in range(epochNum):
     errors = []  # errors of last inference steps per epoch
     for seq in range(seqNum):
+        net.initialise_states()
         for rep in range(repNum):
-            net.initialise_states()
-
             for frame in range(frameNum):
                 inputs = flat_data[seq, frame, :]
                 error_last = net(inputs, training=True)
@@ -280,6 +285,28 @@ net_trained = net
 # testing
 #############################
 
+# extract highest level of representation for RSA
+representation = []
+for seq in range(seqNum):
+    for frame in range(frameNum):
+        net_trained.initialise_states()
+        net_trained(flat_data[seq, frame, :], training=False)
+        representation.append(net_trained.layers[-1].r_output)
+
+pair_dist_euclidean = pairwise_distances(representation)  # euclidean distance of high level representations
+pair_dist_cosine = pairwise_distances(representation, metric='cosine')  # cosine distance of high level representations
+
+fig, axs = plt.subplots(1, 2)
+im1 = axs[0].imshow(pair_dist_euclidean)
+axs[0].set_title('euclidean')
+fig.colorbar(im1, ax = axs[0])
+im2 = axs[1].imshow(pair_dist_cosine)
+axs[1].set_title('cosine')
+fig.colorbar(im2, ax = axs[1])
+plt.show()
+
+# %%
+
 # generate test data for generative capacity
 testFrame = flat_data[np.random.randint(0, seqNum), np.random.randint(0, frameNum), :]
 testFrame[:21] = 0  # partially mask test frame
@@ -291,4 +318,15 @@ ax1.imshow(np.reshape(testFrame, (7, 7)))
 ax2.imshow(np.reshape(recoveredFrame, (7, 7)))
 plt.show()  # regeneration of image show average learning
 
+# %%
 # train a classifier to see whether representation of last layer can predict sequence category
+
+X = []
+Y = []
+for seq in seqNum:
+    for frame in frameNum:
+        X.append(flat_data[seq, frame:])
+        Y.append(seq)
+
+# train test split
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, train_size=len(X) * .7)

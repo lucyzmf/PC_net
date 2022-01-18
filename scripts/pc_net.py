@@ -320,6 +320,13 @@ ax2.imshow(np.reshape(recoveredFrame, (7, 7)), vmin=0, vmax=1)
 plt.show()  # regeneration of image show average learning
 
 # %%
+# inspect weight distribution
+fig, axs = plt.subplots(1, len(network_dimensions)-1)
+for i in range(len(network_dimensions)-1):
+    axs[i].hist(net_trained.layers[i].weights)
+plt.show()
+
+# %%
 # train a classifier to see whether representation of last layer can predict sequence category
 
 X = []

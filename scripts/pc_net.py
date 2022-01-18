@@ -224,7 +224,7 @@ input_dim = dataWidth ** 2
 network_dimensions = [input_dim, 70, 20]  # input, hidden, output dimensions of network
 inf_baserate = .1  # base inference rate
 inf_rates = [inf_baserate, inf_baserate/4, inf_baserate/8]  # ajustment rate of representations for each layer
-learningRate = 0.1
+learningRate = 0.15
 
 net = PC_Net(network_dimensions, inf_rates, lr=learningRate)
 

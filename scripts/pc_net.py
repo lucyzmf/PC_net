@@ -147,7 +147,7 @@ class PC_Net:
         # first layer activation reflect inputs, higher layer activation initialised to small constant value = 0.1
         for layer in self.layers:
             if layer.size != self.architecture[0]:  # if layer size = input size
-                layer.r_activation = np.full(layer.size, 0.1)
+                layer.r_activation = np.full(layer.size, 0.01)
                 layer()
 
     def __call__(self, inputs, inf_steps=5):
@@ -255,7 +255,7 @@ net = PC_Net(network_dimensions, inf_rates, lr=learningRate)
 #############################
 
 epochNum = 20
-repNum = 80  # num of times a sequence is repeated before moving to next sequence
+repNum = 50  # num of times a sequence is repeated before moving to next sequence
 
 net.reset()
 avg_error = []

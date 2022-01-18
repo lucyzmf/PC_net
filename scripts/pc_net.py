@@ -150,7 +150,7 @@ class PC_Net:
                 layer.r_activation = np.full(layer.size, 0.1)
                 layer()
 
-    def __call__(self, inputs, inf_steps=10):
+    def __call__(self, inputs, inf_steps=5):
         # initialise network
         self.layers[0].r_activation = self.layers[0].r_output = inputs
 
@@ -221,10 +221,10 @@ class PC_Net:
 # instantiating network
 ##############################
 input_dim = dataWidth ** 2
-network_dimensions = [input_dim, 70, 30, 10]  # input, hidden, output dimensions of network
+network_dimensions = [input_dim, 60, 20]  # input, hidden, output dimensions of network
 inf_baserate = .1  # base inference rate
-inf_rates = [inf_baserate, inf_baserate/2, inf_baserate/3, inf_baserate/4]  # ajustment rate of representations for each layer
-learningRate = 0.025
+inf_rates = [inf_baserate, inf_baserate/2, inf_baserate/3]  # ajustment rate of representations for each layer
+learningRate = 0.05
 
 net = PC_Net(network_dimensions, inf_rates, lr=learningRate)
 
@@ -291,7 +291,7 @@ representation = []
 for seq in range(seqNum):
     for frame in range(frameNum):
         net_trained.initialise_states()
-        net_trained(flat_data[seq, frame, :], inf_steps=100)
+        net_trained(flat_data[seq, frame, :], inf_steps=50)
         representation.append(net_trained.layers[-1].r_output)
 
 pair_dist_euclidean = pairwise_distances(representation)  # euclidean distance of high level representations

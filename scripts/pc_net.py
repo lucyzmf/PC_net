@@ -221,10 +221,10 @@ class PC_Net:
 # instantiating network
 ##############################
 input_dim = dataWidth ** 2
-network_dimensions = [input_dim, 60, 20]  # input, hidden, output dimensions of network
+network_dimensions = [input_dim, 70, 20]  # input, hidden, output dimensions of network
 inf_baserate = .1  # base inference rate
-inf_rates = [inf_baserate, inf_baserate/2, inf_baserate/3]  # ajustment rate of representations for each layer
-learningRate = 0.05
+inf_rates = [inf_baserate, inf_baserate/4, inf_baserate/8]  # ajustment rate of representations for each layer
+learningRate = 0.1
 
 net = PC_Net(network_dimensions, inf_rates, lr=learningRate)
 
@@ -254,8 +254,8 @@ net = PC_Net(network_dimensions, inf_rates, lr=learningRate)
 # training loop
 #############################
 
-epochNum = 100
-repNum = 10  # num of times a sequence is repeated before moving to next sequence
+epochNum = 20
+repNum = 80  # num of times a sequence is repeated before moving to next sequence
 
 net.reset()
 avg_error = []

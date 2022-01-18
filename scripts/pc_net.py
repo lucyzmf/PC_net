@@ -291,7 +291,7 @@ representation = []
 for seq in range(seqNum):
     for frame in range(frameNum):
         net_trained.initialise_states()
-        net_trained(flat_data[seq, frame, :], inf_steps=50)
+        net_trained(flat_data[seq, frame, :], inf_steps=500)
         representation.append(net_trained.layers[-1].r_output)
 
 pair_dist_euclidean = pairwise_distances(representation)  # euclidean distance of high level representations
@@ -324,6 +324,23 @@ plt.show()  # regeneration of image show average learning
 fig, axs = plt.subplots(1, len(network_dimensions)-1)
 for i in range(len(network_dimensions)-1):
     axs[i].hist(net_trained.layers[i].weights)
+plt.show()
+
+# %%
+# plot output of last layer during inference in trained network
+steps = 2000
+x = np.arange(steps)
+
+outputs = []
+net_trained.initialise_states()
+for inf in range(steps):
+    net_trained(testFrame, inf_steps=1)
+    outputs.append(net_trained.layers[-1].r_output)
+
+outputs = np.reshape(outputs, (steps, 20))
+
+for i in range(20):
+    plt.plot(x, outputs[:, i])
 plt.show()
 
 # %%

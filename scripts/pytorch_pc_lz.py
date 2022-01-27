@@ -35,8 +35,10 @@ dtype = torch.float  # Set standard datatype
 # %%
 # helper functions
 
-def sigmoid(x):
-    return nn.Sigmoid(x + 3)
+def sigmoid(inputs):
+    inputs = inputs - 3
+    m = nn.Sigmoid()
+    return m(inputs)
 
 
 # %%
@@ -58,31 +60,50 @@ class PredLayer(nn.Module):
         self.infRate = inf_rate  # inference rate governing how fast r adjust to errors
         self.actFunc = act_func
 
-        self.weight = Parameter(torch.empty((layer_size, out_size), **factory_kwargs), requires_grad=False)
+        self.weights = torch.empty((layer_size, out_size), **factory_kwargs)
         self.reset_parameters()
+        self.weights = nn.Parameter(self.weights, requires_grad=False)
         # self.reset_state()
 
     def reset_parameters(self) -> None:  # initialise or reset layer weight
-        nn.init.normal_(self.weight, 0, 0.5)  # normal distribution
-        self.weight = torch.clamp(self.weight, min=0)  # weights clamped to above 0
-        self.weight = self.weights / self.out_size  # normalise weights given next layer size
+        nn.init.normal_(self.weights, 0, 0.5)  # normal distribution
+        self.weights = torch.clamp(self.weights, min=0)  # weights clamped to above 0
+        self.weights = self.weights / self.out_size  # normalise weights given next layer size
 
     # def reset_state(self):
     # reinitialise activation and output values
 
-    def forward(self, inputs, bu_errors, r_act, r_out, nextlayer_r_out):
+    def forward(self, bu_errors, r_act, r_out, nextlayer_r_out):
         # values that is needed per layer: e, r_act, r_out
         # prediction: w_l, r_out_l+1
         # inference: e_l (y_l-pred), w_l-1, e_l-1, return updated e, r_act, r_out
 
-        # e, r_act, r_out each an array, each index correspond to layer
-
         e_act = r_out - torch.matmul(self.weights,
                                      nextlayer_r_out)  # The activity of error neurons is representation - prediction.
-        r_act = r_act + self.inference_rate * (
+        r_act = r_act + self.infRate * (
                 bu_errors - e_act)  # Inference step: Modify activity depending on error
         r_out = self.actFunc(r_act)  # Apply the activation function to get neuronal output
         return e_act, r_act, r_out
+
+    def w_update(self, e_act, nextlayer_output):
+        # Learning step
+        delta = self.learn_rate * torch.matmul(nextlayer_output.reshape(-1, 1), e_act.reshape(1, -1), )
+        self.weights = torch.clamp(self.weights + delta, min=0)  # Keep only positive weights
+
+
+class input_layer(PredLayer):
+    # Additional class for the input layer. This layer does not use a full inference step (driven only by input).
+    def forward(self, inputs, nextlayer_r_out):
+        e_act = inputs - torch.matmul(self.weights, nextlayer_r_out)
+        return e_act
+
+
+class output_layer(PredLayer):
+    # Additional class for last layer. This layer requires a different inference step as no top-down predictions exist.
+    def forward(self, bu_errors, r_act):
+        r_act = r_act + self.infRate * bu_errors
+        r_out = self.actFunc(r_act)
+        return r_act, r_out
 
 
 # %%
@@ -91,24 +112,75 @@ class PredLayer(nn.Module):
 # state dict that registers all the internal activations
 # whenever forward pass is called, reads state dict first, then do computation
 class DHPC(nn.Module):
-    def __init__(self, network_architecture):
-        state_dict = []  # a list that always keep tracks of internal state values
-        for layer in range(len(network_architecture)):
-            r_act = torch.zeros(network_architecture[layer])  # tensor containing activation of representational units
-            r_out = torch.zeros(network_architecture[layer])  # tensor containing output of representational units
-            r_pred = torch.zeros(network_architecture[layer])  # tensor containing value of prediction
-            if layer != len(network_architecture) - 1:
-                e_act = torch.zeros(network_architecture[layer])  # tensor containing activation of error units
-            layer_dict = [r_pred, e_act, r_act, r_out]  # list logging state values of that layer
-            state_dict.append(layer_dict)
+    def __init__(self, network_arch, inf_rates):
+        super().__init__()
+        e_act, r_act, r_out = [], [], []  # a list that always keep tracks of internal state values
+        self.layers = nn.ModuleList()  # create module list containing all layers
+        self.architecture = network_arch
 
+        # e, r_act, r_out each an array, each index correspond to layer
+        for layer in range(len(network_arch)):
+            r_act.append(
+                torch.zeros(network_arch[layer]).to(device))  # tensor containing activation of representational units
+            r_out.append(
+                torch.zeros(network_arch[layer]).to(device))  # tensor containing output of representational units
+            if layer == 0:
+                # add input layer to module list, add input layer state list
+                e_act.append(torch.zeros(network_arch[layer]).to(device))
+                self.layers.append(
+                    input_layer(network_arch[0], network_arch[1], inf_rates[0]))  # append input layer to modulelist
+            elif layer != len(network_arch) - 1:
+                # add middle layer to module list and state list
+                e_act.append(torch.zeros(network_arch[layer]).to(device))  # tensor containing activation of error units
+                self.layers.append(PredLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer]))
+            else:
+                # add output layer to module list
+                e_act.append(None)
+                self.layers.append(output_layer(network_arch[layer], network_arch[layer], inf_rates[layer]))
+
+        self.states = {
+            'error': e_act,
+            'r_activation': r_act,
+            'r_output': r_out,
+        }
+
+    def init_states(self):
+        for i in range(len(self.states['r_activation'])):
+            self.states['r_activation'][i] = -2 * torch.ones(self.architecture[i]).to(device)
+            self.states['r_output'][i] = self.layers[i].actFunc(self.states['r_activation'][i])
+
+    def forward(self, frame, inference_steps):
+        # frame is input to the lowest layer, inference steps
+        e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
+        layers = self.layers
+        r_act[0] = frame  # r units of first layer reflect input
+
+        # inference process
+        for i in range(inference_steps):
+            e_act[0] = layers[0](r_act[0], r_out[1])  # update first layer, given inputs, calculate error
+            for j in range(1, len(layers) - 1):  # iterate through middle layers, forward inference
+                e_act[j], r_act[j], r_out[j] = layers[j](
+                    torch.matmul(torch.transpose(layers[j - 1].weights, 0, 1), e_act[j - 1]),
+                    r_act[j], r_out[j], r_out[j + 1])
+            # update states of last layer
+            r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
+                                              r_act[-1])
+
+# %%
 
 #  data preprocessing
+data = torch.tensor(np.load('rotData.npy'), device=device)  # [samples, sequencelength, dim_x, dim_y]
+flat_data = torch.flatten(data, 2, 3)
+flat_data = flat_data.to(device)
+dataWidth = data.shape[-1]
 
-
+# %%
 #  network instantiation
-network_architecture = [100, 50, 10]
+network_architecture = [100, 50, 20, 10]
+inf_rates = [.05, .05, .05, .05]
 
+net = DHPC(network_architecture, inf_rates)
+net.init_states()
 #  training loop
 
 

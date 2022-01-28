@@ -6,7 +6,6 @@ code inspired by Matthias's code of PCtorch
 """
 import torch
 import torch.nn as nn
-import torch.nn
 from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 import numpy as np
@@ -33,7 +32,9 @@ dtype = torch.float  # Set standard datatype
 
 
 # %%
+###########################
 # helper functions
+###########################
 
 def sigmoid(inputs):
     inputs = inputs - 3
@@ -42,11 +43,14 @@ def sigmoid(inputs):
 
 
 # %%
+###########################
 #  layer class
+###########################
+
 class PredLayer(nn.Module):
     #  object class for standard layer in DHPC with error and representational units
-    def __init__(self, layer_size: int, out_size: int, inf_rate: float, act_func=sigmoid, device=None,
-                 dtype=None) -> None:
+    def __init__(self, layer_size: int, out_size: int, inf_rate: float, lr_rate=.01, act_func=sigmoid, device=device,
+                 dtype=dtype) -> None:
         factory_kwargs = {'device': device, 'dtype': dtype}
         super(PredLayer, self).__init__()  # super().__init__()
         self.layer_size = layer_size  # num of units in this layer
@@ -58,7 +62,8 @@ class PredLayer(nn.Module):
         # self.r_prediction = torch.zeros((layer_size))  # prediction imposed by higher layer
 
         self.infRate = inf_rate  # inference rate governing how fast r adjust to errors
-        self.actFunc = act_func
+        self.actFunc = act_func  # activation function
+        self.learn_rate = lr_rate  # learning rate
 
         self.weights = torch.empty((layer_size, out_size), **factory_kwargs)
         self.reset_parameters()
@@ -87,8 +92,8 @@ class PredLayer(nn.Module):
 
     def w_update(self, e_act, nextlayer_output):
         # Learning step
-        delta = self.learn_rate * torch.matmul(nextlayer_output.reshape(-1, 1), e_act.reshape(1, -1), )
-        self.weights = torch.clamp(self.weights + delta, min=0)  # Keep only positive weights
+        delta = self.learn_rate * torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1))
+        self.weights = nn.Parameter(torch.clamp(self.weights + delta, min=0))  # Keep only positive weights
 
 
 class input_layer(PredLayer):
@@ -107,10 +112,12 @@ class output_layer(PredLayer):
 
 
 # %%
-
+###########################
 #  network class
+###########################
 # state dict that registers all the internal activations
 # whenever forward pass is called, reads state dict first, then do computation
+
 class DHPC(nn.Module):
     def __init__(self, network_arch, inf_rates):
         super().__init__()
@@ -145,7 +152,10 @@ class DHPC(nn.Module):
         }
 
     def init_states(self):
+        # initialise values in state dict
         for i in range(len(self.states['r_activation'])):
+            if i != len(self.architecture) - 1:
+                self.states['error'][i] = torch.zeros(self.architecture[i]).to(device)
             self.states['r_activation'][i] = -2 * torch.ones(self.architecture[i]).to(device)
             self.states['r_output'][i] = self.layers[i].actFunc(self.states['r_activation'][i])
 
@@ -166,13 +176,59 @@ class DHPC(nn.Module):
             r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
                                               r_act[-1])
 
-# %%
+    def learn(self):
+        # iterate through all non last layers to update weights
+        for i in range(len(self.architecture) - 1):
+            self.layers[i].w_update(self.states['error'][i], self.states['r_output'][i + 1])
 
+    def test_frame(self, test_data, inference_steps):
+        # test whether error converge for a single frame after inference
+        total_error = []  # total error history as MSE of all error units in network
+        recon_error = []  # reconstruction error as MSE of error units in the first layer
+
+        self.init_states()
+
+        e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
+        layers = self.layers
+        r_act[0] = test_data  # r units of first layer reflect input
+
+        # inference process
+        for i in range(inference_steps):
+            e_act[0] = layers[0](r_act[0], r_out[1])  # update first layer, given inputs, calculate error
+            recon_error.append(torch.mean(e_act[0].pow(2)))
+            for j in range(1, len(layers) - 1):  # iterate through middle layers, forward inference
+                e_act[j], r_act[j], r_out[j] = layers[j](
+                    torch.matmul(torch.transpose(layers[j - 1].weights, 0, 1), e_act[j - 1]),
+                    r_act[j], r_out[j], r_out[j + 1])
+            # update states of last layer
+            r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
+                                              r_act[-1])
+            total_error.append(torch.mean(torch.pow(e_act[e_act is not None], 2)))
+
+        # plot total error history and reconstruction errors
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        ax1.plot(total_error)
+        ax1.set_title('Total error history')
+        ax1.set_ylim([0, None])
+        ax2.plot(recon_error)
+        ax2.set_title('Reconstruction error (first layer error)')
+        ax2.set_ylim([0, None])
+        plt.show()
+
+
+# %%
 #  data preprocessing
-data = torch.tensor(np.load('rotData.npy'), device=device)  # [samples, sequencelength, dim_x, dim_y]
+data = torch.tensor(np.load('data/translationData.npy'), device=device)  # [samples, sequencelength, dim_x, dim_y]
 flat_data = torch.flatten(data, 2, 3)
 flat_data = flat_data.to(device)
 dataWidth = data.shape[-1]
+
+# %%
+# data visualisation
+# fig, axs = plt.subplots(6, 1, sharex=True, sharey=True)
+# for i in range(len(data[1, :, :, :])):
+#     axs[i].imshow(data[1, i, :, :])
+# plt.show()
 
 # %%
 #  network instantiation

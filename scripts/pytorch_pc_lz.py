@@ -6,13 +6,13 @@ code inspired by Matthias's code of PCtorch
 """
 import torch
 import torch.nn as nn
-from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 import numpy as np
 import scipy
 import math
 import matplotlib
 import matplotlib.pyplot as plt
+from sklearn.metrics import pairwise_distances  # computes the pairwise distance between observations
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import pickle
 from sklearn.neighbors import KNeighborsClassifier
@@ -181,39 +181,132 @@ class DHPC(nn.Module):
         for i in range(len(self.architecture) - 1):
             self.layers[i].w_update(self.states['error'][i], self.states['r_output'][i + 1])
 
-    def test_frame(self, test_data, inference_steps):
-        # test whether error converge for a single frame after inference
-        total_error = []  # total error history as MSE of all error units in network
-        recon_error = []  # reconstruction error as MSE of error units in the first layer
+    def total_error(self):
+        total = []
+        for i in range(len(self.architecture) - 1):
+            error = torch.mean(torch.pow(self.states['error'][i], 2))
+            total.append(error)
+        return torch.mean(torch.tensor(total))
 
-        self.init_states()
 
-        e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
-        layers = self.layers
-        r_act[0] = test_data  # r units of first layer reflect input
+# %%
+###########################
+#  evaluation functions
+###########################
 
-        # inference process
-        for i in range(inference_steps):
-            e_act[0] = layers[0](r_act[0], r_out[1])  # update first layer, given inputs, calculate error
-            recon_error.append(torch.mean(e_act[0].pow(2)))
-            for j in range(1, len(layers) - 1):  # iterate through middle layers, forward inference
-                e_act[j], r_act[j], r_out[j] = layers[j](
-                    torch.matmul(torch.transpose(layers[j - 1].weights, 0, 1), e_act[j - 1]),
-                    r_act[j], r_out[j], r_out[j + 1])
-            # update states of last layer
-            r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
-                                              r_act[-1])
-            total_error.append(torch.mean(torch.pow(e_act[e_act is not None], 2)))
+def test_frame(model, test_data, inference_steps):
+    # test whether error converge for a single frame after inference
+    total_error = []  # total error history as MSE of all error units in network
+    recon_error = []  # reconstruction error as MSE of error units in the first layer
 
-        # plot total error history and reconstruction errors
-        fig, (ax1, ax2) = plt.subplots(1, 2)
-        ax1.plot(total_error)
-        ax1.set_title('Total error history')
-        ax1.set_ylim([0, None])
-        ax2.plot(recon_error)
-        ax2.set_title('Reconstruction error (first layer error)')
-        ax2.set_ylim([0, None])
+    model.init_states()
+
+    e_act, r_act, r_out = model.states['error'], model.states['r_activation'], model.states['r_output']
+    layers = model.layers
+    r_act[0] = test_data  # r units of first layer reflect input
+
+    # inference process
+    for i in range(inference_steps):
+        e_act[0] = layers[0](r_act[0], r_out[1])  # update first layer, given inputs, calculate error
+        recon_error.append(torch.mean(e_act[0].pow(2)))
+        for j in range(1, len(layers) - 1):  # iterate through middle layers, forward inference
+            e_act[j], r_act[j], r_out[j] = layers[j](
+                torch.matmul(torch.transpose(layers[j - 1].weights, 0, 1), e_act[j - 1]),
+                r_act[j], r_out[j], r_out[j + 1])
+        # update states of last layer
+        r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
+                                          r_act[-1])
+
+        # calculate total error
+        total = []
+        for i in range(len(model.architecture) - 1):
+            error = torch.mean(torch.pow(model.states['error'][i], 2))
+            total.append(error)
+
+        total_error.append(total)
+
+    # plot total error history and reconstruction errors
+    fig1, ax1 = plt.subplots()
+    x = np.arange(inference_steps)
+    ax1.plot(total_error)
+    ax1.set_title('Total error history')
+    ax1.set_ylim([0, None])
+    plt.show()
+
+    fig2, ax2 = plt.subplots()
+    ax2.plot(recon_error)
+    ax2.set_title('Reconstruction error (first layer error)')
+    ax2.set_ylim([0, None])
+    plt.show()
+
+
+def generate_rdm(model, test_sequences, inference_steps, plot=False):
+    # test sequence include all frames of tested sequences
+    sequences = len(test_sequences)
+    frames = len(test_sequences[0])
+
+    representation = []  # array containing representation from highest layer
+
+    for seq in range(sequences):
+        for frame in range(frames):
+            model.init_states()  # initialise states between each frame
+            model.forward(test_sequences[seq, frame, :], inference_steps)
+            representation.append(model.states['r_activation'][-1].detach().numpy())
+
+    pair_dist_cosine = pairwise_distances(representation, metric='cosine')
+
+    if plot:
+        fig, ax = plt.subplots()
+        im = ax.imshow(pair_dist_cosine)
+        fig.colorbar(im, ax=ax)
+        ax.set_title('RDM cosine')
         plt.show()
+
+    return representation
+
+
+# %%
+# test function: takes the model, generates highest level representations, use KNN to classify
+def test_accuracy(model, test_data):
+    rep_list = generate_rdm(model, test_data, 1000, plot=False)
+    label_list = []  # List with correct class labels
+    for i in range(test_data.shape[0]):  # Iterate through sequences
+        for j in range(test_data.shape[1]):  # Iterate through frames in each sequence
+            label_list.append(i)  # Append the label (from 0 to 9)
+    labels = np.stack(label_list, axis=0)
+    reps = np.stack(rep_list, axis=0)
+
+    # Select two samples of each class as test set, classify with knn (k = 3)
+    skf = StratifiedKFold(n_splits=3)  # with six instances per class, each of the three folds contains two
+    skf.get_n_splits(reps, labels)
+    cumulative_accuracy = 0
+    # Now iterate through all folds
+    for train_index, test_index in skf.split(reps, labels):
+        # print("TRAIN:", train_index, "TEST:", test_index)
+        reps_train, reps_test = reps[train_index], reps[test_index]
+        labels_train, labels_test = labels[train_index], labels[test_index]
+        labels_train_vec = np.zeros([40, 10])
+        labels_test_vec = np.zeros([20, 10])
+        for i in range(40):
+            labels_train_vec[i, math.floor(i / 4)] = 1
+        for i in range(20):
+            labels_test_vec[i, math.floor(i / 2)] = 1
+        # neigh = KNeighborsClassifier(n_neighbors=3, metric = distance) # build  KNN classifier for this fold
+        # neigh.fit(reps_train, labels_train) # Use training data for KNN classifier
+        # labels_predicted = neigh.predict(reps_test) # Predictions across test set
+
+        reg = linear_model.LinearRegression()
+        reg.fit(reps_train, labels_train_vec)
+        labels_predicted = reg.predict(reps_test)
+
+        # Convert to one-hot
+        labels_predicted = (labels_predicted == labels_predicted.max(axis=1, keepdims=True)).astype(int)
+
+        # Calculate accuracy on test set: put test set into model, calculate fraction of TP+TN over all responses
+        accuracy = accuracy_score(labels_test_vec, labels_predicted)
+        # https://www.svds.com/the-basics-of-classifier-evaluation-part-1/
+        cumulative_accuracy += accuracy / 3
+    return cumulative_accuracy
 
 
 # %%
@@ -231,14 +324,55 @@ dataWidth = data.shape[-1]
 # plt.show()
 
 # %%
-#  network instantiation
-network_architecture = [100, 50, 20, 10]
-inf_rates = [.05, .05, .05, .05]
+###########################
+### Training loop
+###########################
 
-net = DHPC(network_architecture, inf_rates)
-net.init_states()
-#  training loop
+with torch.no_grad():  # turn off auto grad function
+
+    # Hyperparameters for training
+    inference_steps = 10
+    epochs = 5
+    cycles_per_frame = 5
+    cycles_per_sequence = 10
+
+    #  network instantiation
+    network_architecture = [dataWidth ** 2, 2000, 500, 30]
+    inf_rates = [.05, .05, .05, .05]
+
+    net = DHPC(network_architecture, inf_rates)
+    net.to(device)
+
+    sequences = len(flat_data)
+    frames = len(flat_data[0])
+
+    total_errors = []
+
+    for epoch in range(epochs):
+        error_per_seq = []
+        for seq in range(sequences):  # for each sequence
+            net.init_states()
+            for s in range(cycles_per_sequence):  # several cycles per sequence
+                for frame in range(frames):  # for each frame
+                    for f in range(cycles_per_frame):  # several cycles per frame
+                        data = flat_data[seq, frame, :]
+                        net(data, inference_steps)
+                        net.learn()
+            error_per_seq.append(net.total_error())
+
+        total_errors.append(np.mean(error_per_seq))
+        test_accuracy(net, flat_data)
+
+    fig, ax = plt.subplots()
+    plt.plot(total_errors)
+    plt.show()
 
 
-#  evaluation
+
+
+
+# %%
+# test_accuracy(net, flat_data)
+
+# generate_rdm(net, flat_data, 10)
 #  register_forward_hook can be used to inspect internal activation

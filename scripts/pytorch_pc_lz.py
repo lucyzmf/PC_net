@@ -306,6 +306,7 @@ def test_accuracy(model, test_data):
         accuracy = accuracy_score(labels_test_vec, labels_predicted)
         # https://www.svds.com/the-basics-of-classifier-evaluation-part-1/
         cumulative_accuracy += accuracy / 3
+
     return cumulative_accuracy
 
 
@@ -347,6 +348,7 @@ with torch.no_grad():  # turn off auto grad function
     frames = len(flat_data[0])
 
     total_errors = []
+    acc_history = []
 
     for epoch in range(epochs):
         error_per_seq = []
@@ -361,10 +363,16 @@ with torch.no_grad():  # turn off auto grad function
             error_per_seq.append(net.total_error())
 
         total_errors.append(np.mean(error_per_seq))
-        test_accuracy(net, flat_data)
+        acc = test_accuracy(net, flat_data)
+        acc_history.append(acc)
 
-    fig, ax = plt.subplots()
-    plt.plot(total_errors)
+        print('epoch: ', epoch, '. classification acc: ', acc)
+
+    fig, axs = plt.subplots(1, 2)
+    axs[0].plot(total_errors)
+    axs[0].set_title('Total Errors')
+    axs[1].plot(acc_history)
+    axs[1].set_title('Classification accuracy')
     plt.show()
 
 
@@ -374,5 +382,5 @@ with torch.no_grad():  # turn off auto grad function
 # %%
 # test_accuracy(net, flat_data)
 
-# generate_rdm(net, flat_data, 10)
+generate_rdm(net, flat_data, 1000, plot=True)
 #  register_forward_hook can be used to inspect internal activation

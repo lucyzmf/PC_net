@@ -110,7 +110,7 @@ class PredLayer(nn.Module):
 class input_layer(PredLayer):
     # Additional class for the input layer. This layer does not use a full inference step (driven only by input).
     def forward(self, inputs, nextlayer_r_out):
-        e_act = inputs - torch.matmul(self.weights, nextlayer_r_out)
+        e_act = inputs.to(device) - torch.matmul(self.weights, nextlayer_r_out)
         return e_act
 
 
@@ -120,7 +120,6 @@ class output_layer(PredLayer):
         r_act = r_act + self.infRate * bu_errors
         r_out = self.actFunc(r_act)
         return r_act, r_out
-
 
 # %%
 ###########################
@@ -262,10 +261,10 @@ def generate_rdm(model, data_loader, inf_steps,
         labels.append(_label)
 
     sorted_label, indices = torch.sort(torch.tensor(labels))
-    representation = torch.tensor(representation)
+    representation = torch.stack(representation)
     representation = representation[indices]
 
-    pair_dist_cosine = pairwise_distances(representation, metric='cosine')
+    pair_dist_cosine = pairwise_distances(representation.cpu(), metric='cosine')
 
     if plot:
         fig, ax = plt.subplots()
@@ -328,6 +327,7 @@ def test_accuracy(model, test_data):
 
 def train_classifier(model, reg_classifier,
                      data_loader):  # take network, classifier, and training data as input, return trained classifier
+    print('finished learning, start training classifier')
     train_x = []  # contains last layer representations learned from training data
     train_y = []  # contains labels in training data
     for i, (_image, _label) in enumerate(data_loader):
@@ -344,8 +344,8 @@ def train_classifier(model, reg_classifier,
         loss_epoch = []
         for i, (_image, _label) in enumerate(dataloader_classify):
             optimizer.zero_grad()
-            outputs = reg_classifier(_image)
-            loss = criterion(outputs, _label)
+            outputs = reg_classifier(_image.to(device))
+            loss = criterion(outputs, _label.to(device))
             loss_epoch.append(loss.item())
             loss.backward()
             optimizer.step()
@@ -361,7 +361,7 @@ def train_classifier(model, reg_classifier,
         correct = []
         total = 0
         for i, (_image, _label) in enumerate(dataloader_classify):
-            _output = reg_classifier(_image)
+            _output = reg_classifier(_image.to(device))
             _, predicted = torch.max(F.softmax(_output), 1)
             correct += (predicted.cpu() == train_y[i])
             total += 1
@@ -372,6 +372,7 @@ def train_classifier(model, reg_classifier,
 
 
 def test_classifier(model, reg_classifier, data_loader):
+    print('testing classifier')
     test_x = []  # contains last layer representations generated from test data
     test_y = []  # contains labels in test data
 
@@ -388,7 +389,7 @@ def test_classifier(model, reg_classifier, data_loader):
         correct = []
         total = 0
         for i, (_image, _label) in enumerate(dataloader_classify):
-            _output = reg_classifier(_image)
+            _output = reg_classifier(_image.to(device))
             _, predicted = torch.max(F.softmax(_output), 1)
             correct += (predicted.cpu() == test_y[i])
             total += 1
@@ -436,11 +437,12 @@ test_loader = DataLoader(test_dataset, shuffle=True)
 
 # Hyperparameters for training
 inference_steps = 10
-epochs = 2
+epochs = 100
 
 #  network instantiation
 network_architecture = [dataWidth ** 2, 2000, 500, 30]
 inf_rates = [.05, .05, .05, .05]
+per_im_repeat = 30
 
 net = DHPC(network_architecture, inf_rates)
 net.to(device)
@@ -449,45 +451,53 @@ net.to(device)
 classifier = LogisticRegression(network_architecture[-1], 10)
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(classifier.parameters(), lr=.01)
+classifier.to(device)
 
+# %%
 # values logged during training
 total_errors = []
 train_acc_history = []
 test_acc_history = []  # acc on test set at the end of each epoch
 
 for epoch in range(epochs):
+
     errors = []
     for i, (image, label) in enumerate(train_loader):
         net.init_states()
-        net(torch.flatten(image), inference_steps)
+        for j in range(per_im_repeat):
+            net(torch.flatten(image), inference_steps)
         net.learn()
         errors.append(net.total_error())
 
-    # train classifier using training data
-    train_acc = train_classifier(net, classifier, train_loader)
-    print(train_acc)
-
     total_errors.append(np.mean(errors))  # mean error per epoch
 
-    # test classification acc at the end of each epoch
-    test_acc = test_classifier(net, classifier, test_loader)  # test classifier on test set (unseen data)
-    train_acc_history.append(train_acc)
-    test_acc_history.append(test_acc)
+    print('epoch: %i, total error: %.2f' % (epoch, total_errors[-1]))
 
-    print('epoch: ', epoch, '. classifier training acc: ', train_acc, '. classifier test acc: ', test_acc)
+    if (epoch == epochs - 1) or (epoch == round(epochs / 2)):
+        # train classifier using training data
+        train_acc = train_classifier(net, classifier, train_loader)
+        print(train_acc)
 
-fig, axs = plt.subplots(1, 3)
-axs[0].plot(total_errors)
-axs[0].set_title('Total Errors')
-axs[1].plot(train_acc_history)
-axs[1].set_title('train classification accuracy')
-axs[2].plot(test_acc_history)
-axs[2].set_title('test classification accuracy')
-plt.show()
+        # test classification acc at the end of each epoch
+        test_acc = test_classifier(net, classifier, test_loader)  # test classifier on test set (unseen data)
+        train_acc_history.append(train_acc)
+        test_acc_history.append(test_acc)
+
+        print('epoch: ', epoch, '. classifier training acc: ', train_acc, '. classifier test acc: ', test_acc)
+
+    fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+    axs[0].plot(total_errors)
+    axs[0].set_title('Total Errors')
+    axs[1].plot(train_acc_history)
+    axs[1].set_title('train classification accuracy')
+    axs[2].plot(test_acc_history)
+    axs[2].set_title('test classification accuracy')
+    plt.tight_layout()
+    plt.show()
 
 # %%
 # test_accuracy(net, flat_data)
 
 generate_rdm(net, train_loader, 1000, plot=True)
-generate_rdm(net, test_loader, 1000, plot=True)
+# generate_rdm(net, test_loader, 1000, plot=True)
 #  register_forward_hook can be used to inspect internal activation

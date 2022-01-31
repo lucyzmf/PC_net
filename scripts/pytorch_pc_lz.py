@@ -13,6 +13,8 @@ import math
 import matplotlib
 import matplotlib.pyplot as plt
 import torchvision
+from torch.utils.data import Subset, DataLoader
+from torch.autograd import Variable
 from sklearn.metrics import pairwise_distances  # computes the pairwise distance between observations
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import pickle
@@ -20,7 +22,6 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn import linear_model
-from torch.utils.data import Subset, DataLoader
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
@@ -38,10 +39,23 @@ dtype = torch.float  # Set standard datatype
 # helper functions
 ###########################
 
+#  sigmoid activation function
 def sigmoid(inputs):
     inputs = inputs - 3
     m = nn.Sigmoid()
     return m(inputs)
+
+
+#  pytorch logistic regression
+class LogisticRegression(torch.nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(LogisticRegression, self).__init__()
+        self.linear = torch.nn.Linear(input_dim, output_dim)
+
+    def forward(self, x):
+        outputs = torch.sigmoid(self.linear(x))
+        return outputs
+
 
 
 # %%
@@ -263,7 +277,7 @@ def generate_rdm(model, data_loader, inf_steps, plot=True):  # generate rdm to i
 def high_level_rep(model, image, inference_steps):
     model.init_states()
     model.forward(torch.flatten(image), inference_steps)
-    return model.states['r_activation'][-1].cpu().detach().numpy()
+    return model.states['r_activation'][-1].detach()
 
 
 # %%
@@ -311,31 +325,57 @@ def test_accuracy(model, test_data):
     return cumulative_accuracy
 
 
-def train_classifier(model, reg_model, data_loader):  # take network, classifier, and training data as input, return trained classifier
+def train_classifier(model, reg_classifier, data_loader):  # take network, classifier, and training data as input, return trained classifier
     train_x = []  # contains last layer representations learned from training data
     train_y = []  # contains labels in training data
     for i, (_image, _label) in enumerate(data_loader):
         train_x.append(high_level_rep(model, torch.flatten(_image), 1000))
         train_y.append(_label)
 
-    reg_model.fit(train_x, train_y)
+    train_x, train_y = torch.tensor(train_x), F.one_hot(torch.tensor(train_y), num_classes=10)
+    loss_log = []
 
-    return reg_model
+    for _epoch in range (50):
+        reg_classifier.train()
+        optimizer.zero_grad()
+        outputs = reg_classifier(train_x)
+        loss = criterion(outputs, train_y)
+        loss_log.append(loss)
+        loss.backward()
+        optimizer.step()
+
+    fig, ax = plt.subplots()
+    plt.plot(loss_log)
+    plt.title('classifier loss training')
+    plt.show()
+
+    with torch.no_grad():
+        reg_classifier.eval()
+        _output = reg_classifier(train_x)
+        _, predicted = torch.max(_output, 1)
+        correct = torch.sum(predicted.cpu() == train_y)
+        _acc = correct/len(train_y)  # prediction acc of trained classifier
+
+    return _acc
 
 
-def test_classifier(model, reg_model, data_loader):
-    test_x = []  # contains last layer representations learned from test data
-    test_y = []  # contains labels in test data
+def test_classifier(model, reg_classifier, data_loader):
+    test_x = []  # contains last layer representations learned from training data
+    test_y = []  # contains labels in training data
     for i, (_image, _label) in enumerate(data_loader):
         test_x.append(high_level_rep(model, torch.flatten(_image), 1000))
         test_y.append(_label)
 
-    labels_predicted = reg_model.predict(test_x)
-    labels_predicted = (labels_predicted == labels_predicted.max(axis=1, keepdims=True)).astype(int)
+    test_x, test_y = torch.tensor(test_x), F.one_hot(torch.tensor(test_y), num_classes=10)
 
-    accuracy = accuracy_score(test_y, labels_predicted)
+    with torch.no_grad():
+        reg_classifier.eval()
+        _output = reg_classifier(test_x)
+        _, predicted = torch.max(_output, 1)
+        correct = torch.sum(predicted.cpu() == test_y)
+        _acc = correct/len(test_y)  # prediction acc of trained classifier
 
-    return accuracy
+    return _acc
 
 
 # %%
@@ -361,6 +401,7 @@ train_dataset = Subset(full_mnist, train_indices)
 test_dataset = Subset(full_mnist, test_indices)
 
 dataWidth = train_dataset[0][0].shape[1]
+numClass = 10  # number of classes in mnist
 # %%
 
 train_loader = DataLoader(train_dataset, shuffle=True)
@@ -371,54 +412,57 @@ test_loader = DataLoader(test_dataset, shuffle=True)
 ### Training loop
 ###########################
 
-with torch.no_grad():  # turn off auto grad function
+# with torch.no_grad():  # turn off auto grad function
 
-    # Hyperparameters for training
-    inference_steps = 10
-    epochs = 10
+# Hyperparameters for training
+inference_steps = 10
+epochs = 2
 
-    #  network instantiation
-    network_architecture = [dataWidth ** 2, 2000, 500, 30]
-    inf_rates = [.05, .05, .05, .05]
+#  network instantiation
+network_architecture = [dataWidth ** 2, 2000, 500, 30]
+inf_rates = [.05, .05, .05, .05]
 
-    net = DHPC(network_architecture, inf_rates)
-    net.to(device)
+net = DHPC(network_architecture, inf_rates)
+net.to(device)
 
-    classifier = linear_model.LinearRegression()
+#  initialising classifier
+classifier = LogisticRegression(network_architecture[-1], 10)
+criterion = torch.nn.BCELoss(size_average=True)
+optimizer = torch.optim.SGD(classifier.parameters(), lr=.01)
 
-    total_errors = []
-    train_acc_history = []
-    test_acc_history = []
+# values logged during training
+total_errors = []
+train_acc_history = []
+test_acc_history = []  # acc on test set at the end of each epoch
 
-    for epoch in range(epochs):
-        errors = []
-        for i, (image, label) in enumerate(train_loader):
-            net.init_states()
-            net(torch.flatten(image), inference_steps)
-            net.learn()
-            errors.append(net.total_error())
-            # train classifier using training data
-            classifier = train_classifier(net, classifier, train_loader)
-            # need function that take classifier and training data and returned trained classifier
+for epoch in range(epochs):
+    errors = []
+    for i, (image, label) in enumerate(train_loader):
+        net.init_states()
+        net(torch.flatten(image), inference_steps)
+        net.learn()
+        errors.append(net.total_error())
 
-        total_errors.append(np.mean(errors))  # mean error per epoch
+    # train classifier using training data
+    train_acc = train_classifier(net, classifier, train_loader)
 
-        # test classification acc at the end of each epoch
-        train_acc = test_classifier(net, classifier, train_loader)  # test classifier on training set
-        test_acc = test_classifier(net, classifier, test_loader)  # test classifier on test set (unseen data)
-        train_acc_history.append(train_acc)
-        test_acc_history.append(test_acc)
+    total_errors.append(np.mean(errors))  # mean error per epoch
 
-        print('epoch: ', epoch, '. training acc: ', train_acc, '. test acc: ', test_acc)
+    # test classification acc at the end of each epoch
+    test_acc = test_classifier(net, classifier, test_loader)  # test classifier on test set (unseen data)
+    train_acc_history.append(train_acc)
+    test_acc_history.append(test_acc)
 
-    fig, axs = plt.subplots(1, 3)
-    axs[0].plot(total_errors)
-    axs[0].set_title('Total Errors')
-    axs[1].plot(train_acc_history)
-    axs[1].set_title('train classification accuracy')
-    axs[2].plot(test_acc_history)
-    axs[2].set_title('test classification accuracy')
-    plt.show()
+    print('epoch: ', epoch, '. classifier training acc: ', train_acc, '. classifier test acc: ', test_acc)
+
+fig, axs = plt.subplots(1, 3)
+axs[0].plot(total_errors)
+axs[0].set_title('Total Errors')
+axs[1].plot(train_acc_history)
+axs[1].set_title('train classification accuracy')
+axs[2].plot(test_acc_history)
+axs[2].set_title('test classification accuracy')
+plt.show()
 
 # %%
 # test_accuracy(net, flat_data)

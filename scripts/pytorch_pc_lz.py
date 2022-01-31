@@ -13,6 +13,7 @@ import math
 import matplotlib
 import matplotlib.pyplot as plt
 import torchvision
+from torch.utils import data
 from torch.utils.data import Subset, DataLoader
 from torch.autograd import Variable
 from sklearn.metrics import pairwise_distances  # computes the pairwise distance between observations
@@ -53,9 +54,8 @@ class LogisticRegression(torch.nn.Module):
         self.linear = torch.nn.Linear(input_dim, output_dim)
 
     def forward(self, x):
-        outputs = torch.sigmoid(self.linear(x))
+        outputs = self.linear(x)
         return outputs
-
 
 
 # %%
@@ -251,7 +251,8 @@ def test_frame(model, test_data, inference_steps):
     plt.show()
 
 
-def generate_rdm(model, data_loader, inf_steps, plot=True):  # generate rdm to inspect learned high level representation with either train or test data
+def generate_rdm(model, data_loader, inf_steps,
+                 plot=True):  # generate rdm to inspect learned high level representation with either train or test data
     # test sequence include all frames of tested sequences
     representation = []  # array containing representation from highest layer
     labels = []
@@ -325,24 +326,30 @@ def test_accuracy(model, test_data):
     return cumulative_accuracy
 
 
-def train_classifier(model, reg_classifier, data_loader):  # take network, classifier, and training data as input, return trained classifier
+def train_classifier(model, reg_classifier,
+                     data_loader):  # take network, classifier, and training data as input, return trained classifier
     train_x = []  # contains last layer representations learned from training data
     train_y = []  # contains labels in training data
     for i, (_image, _label) in enumerate(data_loader):
-        train_x.append(high_level_rep(model, torch.flatten(_image), 1000))
+        train_x.append(high_level_rep(model, torch.flatten(_image), 500))
         train_y.append(_label)
 
-    train_x, train_y = torch.tensor(train_x), F.one_hot(torch.tensor(train_y), num_classes=10)
+    train_x, train_y = torch.stack(train_x), torch.cat(train_y)
+    dataset = data.TensorDataset(train_x, train_y)
+    dataloader_classify = DataLoader(dataset, shuffle=True)
     loss_log = []
 
-    for _epoch in range (50):
-        reg_classifier.train()
-        optimizer.zero_grad()
-        outputs = reg_classifier(train_x)
-        loss = criterion(outputs, train_y)
-        loss_log.append(loss)
-        loss.backward()
-        optimizer.step()
+    reg_classifier.train()
+    for _epoch in range(100):
+        loss_epoch = []
+        for i, (_image, _label) in enumerate(dataloader_classify):
+            optimizer.zero_grad()
+            outputs = reg_classifier(_image)
+            loss = criterion(outputs, _label)
+            loss_epoch.append(loss.item())
+            loss.backward()
+            optimizer.step()
+        loss_log.append(np.mean(loss_epoch))
 
     fig, ax = plt.subplots()
     plt.plot(loss_log)
@@ -351,29 +358,42 @@ def train_classifier(model, reg_classifier, data_loader):  # take network, class
 
     with torch.no_grad():
         reg_classifier.eval()
-        _output = reg_classifier(train_x)
-        _, predicted = torch.max(_output, 1)
-        correct = torch.sum(predicted.cpu() == train_y)
-        _acc = correct/len(train_y)  # prediction acc of trained classifier
+        correct = []
+        total = 0
+        for i, (_image, _label) in enumerate(dataloader_classify):
+            _output = reg_classifier(_image)
+            _, predicted = torch.max(F.softmax(_output), 1)
+            correct += (predicted.cpu() == train_y[i])
+            total += 1
+
+        _acc = np.sum(correct) / total  # prediction acc of trained classifier
 
     return _acc
 
 
 def test_classifier(model, reg_classifier, data_loader):
-    test_x = []  # contains last layer representations learned from training data
-    test_y = []  # contains labels in training data
+    test_x = []  # contains last layer representations generated from test data
+    test_y = []  # contains labels in test data
+
     for i, (_image, _label) in enumerate(data_loader):
-        test_x.append(high_level_rep(model, torch.flatten(_image), 1000))
+        test_x.append(high_level_rep(model, torch.flatten(_image), 500))
         test_y.append(_label)
 
-    test_x, test_y = torch.tensor(test_x), F.one_hot(torch.tensor(test_y), num_classes=10)
+    test_x, test_y = torch.stack(test_x), torch.cat(test_y)
+    dataset = data.TensorDataset(test_x, test_y)
+    dataloader_classify = DataLoader(dataset, shuffle=True)
 
     with torch.no_grad():
         reg_classifier.eval()
-        _output = reg_classifier(test_x)
-        _, predicted = torch.max(_output, 1)
-        correct = torch.sum(predicted.cpu() == test_y)
-        _acc = correct/len(test_y)  # prediction acc of trained classifier
+        correct = []
+        total = 0
+        for i, (_image, _label) in enumerate(dataloader_classify):
+            _output = reg_classifier(_image)
+            _, predicted = torch.max(F.softmax(_output), 1)
+            correct += (predicted.cpu() == test_y[i])
+            total += 1
+
+        _acc = np.sum(correct) / total  # prediction acc of trained classifier with test dataset
 
     return _acc
 
@@ -393,7 +413,7 @@ full_mnist = torchvision.datasets.MNIST(
 ### genearte train test files for digit classification
 
 indices = np.arange(len(full_mnist))
-train_indices, test_indices = train_test_split(indices, train_size=100 * 10, test_size=20 * 10,
+train_indices, test_indices = train_test_split(indices, train_size=2 * 10, test_size=1 * 10,
                                                stratify=full_mnist.targets)
 
 # Warp into Subsets and DataLoaders
@@ -427,7 +447,7 @@ net.to(device)
 
 #  initialising classifier
 classifier = LogisticRegression(network_architecture[-1], 10)
-criterion = torch.nn.BCELoss(size_average=True)
+criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(classifier.parameters(), lr=.01)
 
 # values logged during training
@@ -445,6 +465,7 @@ for epoch in range(epochs):
 
     # train classifier using training data
     train_acc = train_classifier(net, classifier, train_loader)
+    print(train_acc)
 
     total_errors.append(np.mean(errors))  # mean error per epoch
 

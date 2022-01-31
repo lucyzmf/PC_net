@@ -340,7 +340,7 @@ def train_classifier(model, reg_classifier,
     loss_log = []
 
     reg_classifier.train()
-    for _epoch in range(100):
+    for _epoch in range(200):
         loss_epoch = []
         for i, (_image, _label) in enumerate(dataloader_classify):
             optimizer.zero_grad()

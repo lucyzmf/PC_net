@@ -327,13 +327,13 @@ def test_accuracy(model, test_data):
 
 def train_classifier(model, reg_classifier,
                      data_loader):  # take network, classifier, and training data as input, return trained classifier
-    print('finished learning, start training classifier')
     train_x = []  # contains last layer representations learned from training data
     train_y = []  # contains labels in training data
     for i, (_image, _label) in enumerate(data_loader):
-        train_x.append(high_level_rep(model, torch.flatten(_image), 500))
+        train_x.append(high_level_rep(model, torch.flatten(_image), 1000))
         train_y.append(_label)
 
+    print('finished learning, start training classifier')
     train_x, train_y = torch.stack(train_x), torch.cat(train_y)
     dataset = data.TensorDataset(train_x, train_y)
     dataloader_classify = DataLoader(dataset, shuffle=True)
@@ -372,14 +372,14 @@ def train_classifier(model, reg_classifier,
 
 
 def test_classifier(model, reg_classifier, data_loader):
-    print('testing classifier')
     test_x = []  # contains last layer representations generated from test data
     test_y = []  # contains labels in test data
 
     for i, (_image, _label) in enumerate(data_loader):
-        test_x.append(high_level_rep(model, torch.flatten(_image), 500))
+        test_x.append(high_level_rep(model, torch.flatten(_image), 1000))
         test_y.append(_label)
 
+    print('testing classifier')
     test_x, test_y = torch.stack(test_x), torch.cat(test_y)
     dataset = data.TensorDataset(test_x, test_y)
     dataloader_classify = DataLoader(dataset, shuffle=True)
@@ -414,7 +414,7 @@ full_mnist = torchvision.datasets.MNIST(
 ### genearte train test files for digit classification
 
 indices = np.arange(len(full_mnist))
-train_indices, test_indices = train_test_split(indices, train_size=2 * 10, test_size=1 * 10,
+train_indices, test_indices = train_test_split(indices, train_size=50 * 10, test_size=10 * 10,
                                                stratify=full_mnist.targets)
 
 # Warp into Subsets and DataLoaders
@@ -442,7 +442,7 @@ epochs = 100
 #  network instantiation
 network_architecture = [dataWidth ** 2, 2000, 500, 30]
 inf_rates = [.05, .05, .05, .05]
-per_im_repeat = 30
+per_im_repeat = 5
 
 net = DHPC(network_architecture, inf_rates)
 net.to(device)
@@ -485,15 +485,15 @@ for epoch in range(epochs):
 
         print('epoch: ', epoch, '. classifier training acc: ', train_acc, '. classifier test acc: ', test_acc)
 
-    fig, axs = plt.subplots(1, 3, figsize=(12, 4))
-    axs[0].plot(total_errors)
-    axs[0].set_title('Total Errors')
-    axs[1].plot(train_acc_history)
-    axs[1].set_title('train classification accuracy')
-    axs[2].plot(test_acc_history)
-    axs[2].set_title('test classification accuracy')
-    plt.tight_layout()
-    plt.show()
+fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+axs[0].plot(total_errors)
+axs[0].set_title('Total Errors')
+axs[1].plot(train_acc_history)
+axs[1].set_title('train classification accuracy')
+axs[2].plot(test_acc_history)
+axs[2].set_title('test classification accuracy')
+plt.tight_layout()
+plt.show()
 
 # %%
 # test_accuracy(net, flat_data)

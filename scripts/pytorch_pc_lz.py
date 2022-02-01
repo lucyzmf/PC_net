@@ -121,6 +121,7 @@ class output_layer(PredLayer):
         r_out = self.actFunc(r_act)
         return r_act, r_out
 
+
 # %%
 ###########################
 #  network class
@@ -473,12 +474,12 @@ for epoch in range(epochs):
         errors.append(net.total_error())
         last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
 
-
     total_errors.append(np.mean(errors))  # mean error per epoch
     last_layer_act_log.append(np.mean(last_layer_act))  # mean last layer activation per epoch
 
-    print('epoch: %i, total error: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
-                                                                             last_layer_act_log[-1]))
+    if epoch % 10 == 0:
+        print('epoch: %i, total error: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
+                                                                                 last_layer_act_log[-1]))
 
     if epoch == epochs - 1:
         # train classifier using training data
@@ -513,8 +514,6 @@ x = np.arange(5000)
 for i in range(len(activations[0])):
     plt.plot(x, activations[i])
 plt.show()
-
-
 
 # %%
 # test_accuracy(net, flat_data)

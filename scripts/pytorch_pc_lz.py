@@ -436,7 +436,7 @@ test_loader = DataLoader(test_dataset, shuffle=True)
 # with torch.no_grad():  # turn off auto grad function
 
 # Hyperparameters for training
-inference_steps = 10
+inference_steps = 100
 epochs = 100
 
 #  network instantiation
@@ -456,24 +456,31 @@ classifier.to(device)
 # %%
 # values logged during training
 total_errors = []
+last_layer_act_log = []
 train_acc_history = []
 test_acc_history = []  # acc on test set at the end of each epoch
 
 for epoch in range(epochs):
 
-    errors = []
+    errors = []  # log total error per sample in dataset
+    last_layer_act = []  # log avg act of last layer neurons per sample
+
     for i, (image, label) in enumerate(train_loader):
         net.init_states()
         for j in range(per_im_repeat):
             net(torch.flatten(image), inference_steps)
         net.learn()
         errors.append(net.total_error())
+        last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
+
 
     total_errors.append(np.mean(errors))  # mean error per epoch
+    last_layer_act_log.append(np.mean(last_layer_act))  # mean last layer activation per epoch
 
-    print('epoch: %i, total error: %.2f' % (epoch, total_errors[-1]))
+    print('epoch: %i, total error: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
+                                                                             last_layer_act_log[-1]))
 
-    if (epoch == epochs - 1) or (epoch == round(epochs / 2)):
+    if epoch == epochs - 1:
         # train classifier using training data
         train_acc = train_classifier(net, classifier, train_loader)
         print(train_acc)
@@ -494,6 +501,20 @@ axs[2].plot(test_acc_history)
 axs[2].set_title('test classification accuracy')
 plt.tight_layout()
 plt.show()
+
+# %%
+# plot convergence of last layer activation along inference steps for training data set
+activations = []
+for i, (image, label) in enumerate(train_loader):
+    activations.append(high_level_rep(net, torch.flatten(image), 5000).cpu().numpy())
+
+fig, ax = plt.subplots()
+x = np.arange(5000)
+for i in range(len(activations[0])):
+    plt.plot(x, activations[i])
+plt.show()
+
+
 
 # %%
 # test_accuracy(net, flat_data)

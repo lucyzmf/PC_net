@@ -331,7 +331,7 @@ def train_classifier(model, reg_classifier,
     train_x = []  # contains last layer representations learned from training data
     train_y = []  # contains labels in training data
     for i, (_image, _label) in enumerate(data_loader):
-        train_x.append(high_level_rep(model, torch.flatten(_image), 1000))
+        train_x.append(high_level_rep(model, torch.flatten(_image), 5000))
         train_y.append(_label)
 
     print('finished learning, start training classifier')
@@ -377,7 +377,7 @@ def test_classifier(model, reg_classifier, data_loader):
     test_y = []  # contains labels in test data
 
     for i, (_image, _label) in enumerate(data_loader):
-        test_x.append(high_level_rep(model, torch.flatten(_image), 1000))
+        test_x.append(high_level_rep(model, torch.flatten(_image), 5000))
         test_y.append(_label)
 
     print('testing classifier')
@@ -438,7 +438,7 @@ test_loader = DataLoader(test_dataset, shuffle=True)
 
 # Hyperparameters for training
 inference_steps = 100
-epochs = 100
+epochs = 200
 
 #  network instantiation
 network_architecture = [dataWidth ** 2, 2000, 500, 30]
@@ -457,6 +457,7 @@ classifier.to(device)
 # %%
 # values logged during training
 total_errors = []
+total_errors_test = []
 last_layer_act_log = []
 train_acc_history = []
 test_acc_history = []  # acc on test set at the end of each epoch
@@ -478,8 +479,15 @@ for epoch in range(epochs):
     last_layer_act_log.append(np.mean(last_layer_act))  # mean last layer activation per epoch
 
     if epoch % 10 == 0:
-        print('epoch: %i, total error: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
-                                                                                 last_layer_act_log[-1]))
+        errors_test = []
+        for i, (image, label) in enumerate(test_loader):
+            net.init_states()
+            net(torch.flatten(image), inference_steps)
+            errors_test.append(net.total_error())
+        total_errors_test.append(np.mean(errors_test))
+        print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
+                                                                                            last_layer_act_log[-1]), )
+        print('total error on test set: %.4f' % (total_errors_test[-1]))
 
     if epoch == epochs - 1:
         # train classifier using training data
@@ -493,13 +501,11 @@ for epoch in range(epochs):
 
         print('epoch: ', epoch, '. classifier training acc: ', train_acc, '. classifier test acc: ', test_acc)
 
-fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+fig, axs = plt.subplots(1, 2, figsize=(10, 4))
 axs[0].plot(total_errors)
-axs[0].set_title('Total Errors')
-axs[1].plot(train_acc_history)
-axs[1].set_title('train classification accuracy')
-axs[2].plot(test_acc_history)
-axs[2].set_title('test classification accuracy')
+axs[0].set_title('Total Errors on training set')
+axs[1].plot(total_errors_test)
+axs[1].set_title('Total Errors on test set')
 plt.tight_layout()
 plt.show()
 

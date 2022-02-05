@@ -1,4 +1,10 @@
 # %%
+!pip install wandb -q
+
+import wandb
+wandb.login(key='25f10546ef384a6f1ab9446b42d7513024dea001')
+
+# %%
 
 """
 pytorch implementation of deep hebbian predictive coding(DHPC) net that enables relatively flexible maniputation of network architecture
@@ -130,7 +136,7 @@ class output_layer(PredLayer):
 # whenever forward pass is called, reads state dict first, then do computation
 
 class DHPC(nn.Module):
-    def __init__(self, network_arch, inf_rates):
+    def __init__(self, network_arch, inf_rates, lr_rate):
         super().__init__()
         e_act, r_act, r_out = [], [], []  # a list that always keep tracks of internal state values
         self.layers = nn.ModuleList()  # create module list containing all layers
@@ -146,11 +152,11 @@ class DHPC(nn.Module):
                 # add input layer to module list, add input layer state list
                 e_act.append(torch.zeros(network_arch[layer]).to(device))
                 self.layers.append(
-                    input_layer(network_arch[0], network_arch[1], inf_rates[0]))  # append input layer to modulelist
+                    input_layer(network_arch[0], network_arch[1], inf_rates[0], lr_rate))  # append input layer to modulelist
             elif layer != len(network_arch) - 1:
                 # add middle layer to module list and state list
                 e_act.append(torch.zeros(network_arch[layer]).to(device))  # tensor containing activation of error units
-                self.layers.append(PredLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer]))
+                self.layers.append(PredLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer], lr_rate))
             else:
                 # add output layer to module list
                 e_act.append(None)
@@ -431,28 +437,8 @@ test_loader = DataLoader(test_dataset, shuffle=True)
 
 # %%
 ###########################
-### Training loop
+### Training
 ###########################
-
-# with torch.no_grad():  # turn off auto grad function
-
-# Hyperparameters for training
-inference_steps = 100
-epochs = 200
-
-#  network instantiation
-network_architecture = [dataWidth ** 2, 2000, 500, 30]
-inf_rates = [.05, .05, .05, .05]
-per_im_repeat = 5
-
-net = DHPC(network_architecture, inf_rates)
-net.to(device)
-
-#  initialising classifier
-classifier = LogisticRegression(network_architecture[-1], 10)
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(classifier.parameters(), lr=.01)
-classifier.to(device)
 
 # %%
 # values logged during training
@@ -462,45 +448,124 @@ last_layer_act_log = []
 train_acc_history = []
 test_acc_history = []  # acc on test set at the end of each epoch
 
-for epoch in range(epochs):
+# set up wandb
+wandb.init(project="PC_net", entity="lucyzmf")
 
-    errors = []  # log total error per sample in dataset
-    last_layer_act = []  # log avg act of last layer neurons per sample
+sweep_config = {
+    'method': 'random',
+    'metric': {
+        'name': 'test_loss',
+        'goal': 'minimize'
+    },
+    'parameters': {
+        'epochs': {
+            'values': [100, 200, 500, 1000]
+        },
+        'inference_rates': {
+            'values': [
+                [.05, .05, .05, .05],
+                [.1, .1, .1, .1],
+                [.1, .07, .05, .03]
+            ]
+        },
+        'inference_steps': {
+            'values': [50, 100, 500, 1000]
+        },
+        'lr': {
+            'values': [.001, .01, .05]
+        }
+    }
+}
 
-    for i, (image, label) in enumerate(train_loader):
-        net.init_states()
-        for j in range(per_im_repeat):
-            net(torch.flatten(image), inference_steps)
-        net.learn()
-        errors.append(net.total_error())
-        last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
+# initialise sweep
+sweep_id = wandb.sweep(sweep_config, project="PC_net")
 
-    total_errors.append(np.mean(errors))  # mean error per epoch
-    last_layer_act_log.append(np.mean(last_layer_act))  # mean last layer activation per epoch
 
-    if epoch % 10 == 0:
-        errors_test = []
-        for i, (image, label) in enumerate(test_loader):
+# %%
+def train():
+    config_defaults = {
+        'epochs': 100,
+        'inference_rates': [.05, .05, .05, .05],
+        'inference_steps': 100,
+        'lr': .01
+    }
+
+    # with torch.no_grad():  # turn off auto grad function
+    wandb.init(config=config_defaults)
+    config = wandb.config
+
+    # Hyperparameters for training
+    inference_steps = config.inference_steps
+    epochs = config.epochs
+    inf_rates = config.inference_rates
+    lr_rate = config.lr
+
+    #  network instantiation
+    network_architecture = [dataWidth ** 2, 2000, 500, 30]
+    per_im_repeat = 1
+
+    net = DHPC(network_architecture, inf_rates, lr_rate)
+    net.to(device)
+
+    #  initialising classifier
+    classifier = LogisticRegression(network_architecture[-1], 10)
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(classifier.parameters(), lr=.01)
+    classifier.to(device)
+
+    # start training loop
+    for epoch in range(epochs):
+
+        errors = []  # log total error per sample in dataset
+        last_layer_act = []  # log avg act of last layer neurons per sample
+
+        for i, (image, label) in enumerate(train_loader):
             net.init_states()
-            net(torch.flatten(image), inference_steps)
-            errors_test.append(net.total_error())
-        total_errors_test.append(np.mean(errors_test))
-        print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
-                                                                                            last_layer_act_log[-1]), )
-        print('total error on test set: %.4f' % (total_errors_test[-1]))
+            for j in range(per_im_repeat):
+                net(torch.flatten(image), inference_steps)
+            net.learn()
+            errors.append(net.total_error())
+            last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
 
-    if epoch == epochs - 1:
-        # train classifier using training data
-        train_acc = train_classifier(net, classifier, train_loader)
-        print(train_acc)
+        total_errors.append(np.mean(errors))  # mean error per epoch
+        last_layer_act_log.append(np.mean(last_layer_act))  # mean last layer activation per epoch
 
-        # test classification acc at the end of each epoch
-        test_acc = test_classifier(net, classifier, test_loader)  # test classifier on test set (unseen data)
-        train_acc_history.append(train_acc)
-        test_acc_history.append(test_acc)
+        wandb.log({
+            'epoch': epoch,
+            'train_error': total_errors[-1],
+            'avg last layer act': last_layer_act_log[-1]
+        })
 
-        print('epoch: ', epoch, '. classifier training acc: ', train_acc, '. classifier test acc: ', test_acc)
+        if epoch % 10 == 0:
+            errors_test = []
+            for i, (image, label) in enumerate(test_loader):
+                net.init_states()
+                net(torch.flatten(image), inference_steps)
+                errors_test.append(net.total_error())
+            total_errors_test.append(np.mean(errors_test))
+            print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
+                                                                                                last_layer_act_log[-1]), )
+            print('total error on test set: %.4f' % (total_errors_test[-1]))
 
+            wandb.log({
+                'test_error': total_errors_test[-1]
+            })
+
+        if epoch == epochs - 1:
+            # train classifier using training data
+            train_acc = train_classifier(net, classifier, train_loader)
+            print(train_acc)
+
+            # test classification acc at the end of each epoch
+            test_acc = test_classifier(net, classifier, test_loader)  # test classifier on test set (unseen data)
+            train_acc_history.append(train_acc)
+            test_acc_history.append(test_acc)
+
+            print('epoch: ', epoch, '. classifier training acc: ', train_acc, '. classifier test acc: ', test_acc)
+
+wandb.agent(sweep_id, train)
+
+# %%
 fig, axs = plt.subplots(1, 2, figsize=(10, 4))
 axs[0].plot(total_errors)
 axs[0].set_title('Total Errors on training set')
@@ -508,22 +573,3 @@ axs[1].plot(total_errors_test)
 axs[1].set_title('Total Errors on test set')
 plt.tight_layout()
 plt.show()
-
-# %%
-# plot convergence of last layer activation along inference steps for training data set
-activations = []
-for i, (image, label) in enumerate(train_loader):
-    activations.append(high_level_rep(net, torch.flatten(image), 5000).cpu().numpy())
-
-fig, ax = plt.subplots()
-x = np.arange(5000)
-for i in range(len(activations[0])):
-    plt.plot(x, activations[i])
-plt.show()
-
-# %%
-# test_accuracy(net, flat_data)
-
-generate_rdm(net, train_loader, 1000, plot=True)
-# generate_rdm(net, test_loader, 1000, plot=True)
-#  register_forward_hook can be used to inspect internal activation

@@ -1,12 +1,7 @@
-# %%
-import wandb
-wandb.login(key='25f10546ef384a6f1ab9446b42d7513024dea001')
+'''
+This script tests trained models
+'''
 
-# %%
-"""
-pytorch implementation of deep hebbian predictive coding(DHPC) net that enables relatively flexible maniputation of network architecture
-code inspired by Matthias's code of PCtorch
-"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -133,7 +128,7 @@ class output_layer(PredLayer):
 # whenever forward pass is called, reads state dict first, then do computation
 
 class DHPC(nn.Module):
-    def __init__(self, network_arch, inf_rates, lr):
+    def __init__(self, network_arch, inf_rates):
         super().__init__()
         e_act, r_act, r_out = [], [], []  # a list that always keep tracks of internal state values
         self.layers = nn.ModuleList()  # create module list containing all layers
@@ -149,15 +144,15 @@ class DHPC(nn.Module):
                 # add input layer to module list, add input layer state list
                 e_act.append(torch.zeros(network_arch[layer]).to(device))
                 self.layers.append(
-                    input_layer(network_arch[0], network_arch[1], inf_rates[0], lr_rate=lr))  # append input layer to modulelist
+                    input_layer(network_arch[0], network_arch[1], inf_rates[0]))  # append input layer to modulelist
             elif layer != len(network_arch) - 1:
                 # add middle layer to module list and state list
                 e_act.append(torch.zeros(network_arch[layer]).to(device))  # tensor containing activation of error units
-                self.layers.append(PredLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer], lr_rate=lr))
+                self.layers.append(PredLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer]))
             else:
                 # add output layer to module list
                 e_act.append(None)
-                self.layers.append(output_layer(network_arch[layer], network_arch[layer], inf_rates[layer], lr_rate=lr))
+                self.layers.append(output_layer(network_arch[layer], network_arch[layer], inf_rates[layer]))
 
         self.states = {
             'error': e_act,
@@ -330,11 +325,11 @@ def test_accuracy(model, test_data):
 
 
 def train_classifier(model, reg_classifier,
-                     data_loader, epochNum):  # take network, classifier, and training data as input, return trained classifier
+                     data_loader):  # take network, classifier, and training data as input, return trained classifier
     train_x = []  # contains last layer representations learned from training data
     train_y = []  # contains labels in training data
     for i, (_image, _label) in enumerate(data_loader):
-        train_x.append(high_level_rep(model, torch.flatten(_image), 3000))
+        train_x.append(high_level_rep(model, torch.flatten(_image), 5000))
         train_y.append(_label)
 
     print('finished learning, start training classifier')
@@ -344,7 +339,7 @@ def train_classifier(model, reg_classifier,
     loss_log = []
 
     reg_classifier.train()
-    for _epoch in range(epochNum):
+    for _epoch in range(200):
         loss_epoch = []
         for i, (_image, _label) in enumerate(dataloader_classify):
             optimizer.zero_grad()
@@ -366,7 +361,7 @@ def train_classifier(model, reg_classifier,
         total = 0
         for i, (_image, _label) in enumerate(dataloader_classify):
             _output = reg_classifier(_image.to(device))
-            _, predicted = torch.max(F.softmax(_output, dim=1), 1)
+            _, predicted = torch.max(F.softmax(_output), 1)
             correct += (predicted.cpu() == train_y[i])
             total += 1
 
@@ -380,7 +375,7 @@ def test_classifier(model, reg_classifier, data_loader):
     test_y = []  # contains labels in test data
 
     for i, (_image, _label) in enumerate(data_loader):
-        test_x.append(high_level_rep(model, torch.flatten(_image), 3000))
+        test_x.append(high_level_rep(model, torch.flatten(_image), 5000))
         test_y.append(_label)
 
     print('testing classifier')
@@ -394,7 +389,7 @@ def test_classifier(model, reg_classifier, data_loader):
         total = 0
         for i, (_image, _label) in enumerate(dataloader_classify):
             _output = reg_classifier(_image.to(device))
-            _, predicted = torch.max(F.softmax(_output, dim=1), 1)
+            _, predicted = torch.max(F.softmax(_output), 1)
             correct += (predicted.cpu() == test_y[i])
             total += 1
 
@@ -432,35 +427,20 @@ numClass = 10  # number of classes in mnist
 train_loader = DataLoader(train_dataset, shuffle=True)
 test_loader = DataLoader(test_dataset, shuffle=True)
 
-torch.save(train_loader, '/Users/lucyzhang/Documents/research/PC_net/data/train_loader.pth')
-torch.save(test_loader, '/Users/lucyzhang/Documents/research/PC_net/data/test_loader.pth')
-
 # %%
-###########################
-### Training loop
-###########################
-
-# with torch.no_grad():  # turn off auto grad function
-wandb.init(project="DHPC", entity="lucyzmf")
-
-config = wandb.config
-config.infstep = 100
-config.epoch = 100
-config.infrate = [.1, .07, .05, .03]
-config.lr = .05
-
+# load trained model
 # Hyperparameters for training
-inference_steps = config.infstep
-epochs = config.epoch
+inference_steps = 100
+epochs = 200
 
 #  network instantiation
 network_architecture = [dataWidth ** 2, 2000, 500, 30]
-inf_rates = config.infrate
+inf_rates = [.1, .07, .05, .03]
 per_im_repeat = 1
 
-net = DHPC(network_architecture, inf_rates, lr = config.lr)
-net.to(device)
-wandb.watch(net)
+trained_net = DHPC(network_architecture, inf_rates)
+trained_net.load_state_dict(torch.load('/Users/lucyzhang/Documents/research/PC_net/results/trained_model/epochs200infsteps100infrate[0.1, 0.07, 0.05, 0.03]lr0.05-readout-4layer.pth', map_location=device))
+trained_net.eval()
 
 #  initialising classifier
 classifier = LogisticRegression(network_architecture[-1], 10)
@@ -469,74 +449,13 @@ optimizer = torch.optim.SGD(classifier.parameters(), lr=.01)
 classifier.to(device)
 
 # %%
-# values logged during training
-total_errors = []
-total_errors_test = []
-last_layer_act_log = []
-train_acc_history = []
-test_acc_history = []  # acc on test set at the end of each epoch
+# distribution of trained weights
 
-for epoch in range(epochs):
+fig, axs = plt.subplots(1, len(network_architecture)-1, figsize=(12, 4))
+for i in range(len(network_architecture)-1):
+    axs[i].hist(trained_net.layers[i].weights)
 
-    errors = []  # log total error per sample in dataset
-    last_layer_act = []  # log avg act of last layer neurons per sample
-
-    for i, (image, label) in enumerate(train_loader):
-        net.init_states()
-        for j in range(per_im_repeat):
-            net(torch.flatten(image), inference_steps)
-        net.learn()
-        errors.append(net.total_error())
-        last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
-
-    total_errors.append(np.mean(errors))  # mean error per epoch
-    last_layer_act_log.append(np.mean(last_layer_act))  # mean last layer activation per epoch
-
-    wandb.log({
-        'epoch': epoch,
-        'train_error': total_errors[-1],
-        'avg last layer act': last_layer_act_log[-1]
-    })
-
-    if epoch % 10 == 0:
-        errors_test = []
-        for i, (image, label) in enumerate(test_loader):
-            net.init_states()
-            net(torch.flatten(image), inference_steps)
-            errors_test.append(net.total_error())
-        total_errors_test.append(np.mean(errors_test))
-        print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
-                                                                                            last_layer_act_log[-1]), )
-        print('total error on test set: %.4f' % (total_errors_test[-1]))
-
-        wandb.log({
-            'test_error': total_errors_test[-1]
-        })
-
-    if (epoch == 0) or (epoch == epochs/2) or (epoch == epochs - 1):
-        # train classifier using training data
-        train_acc = train_classifier(net, classifier, train_loader, 1)
-        print(train_acc)
-
-        # test classification acc at the end of each epoch
-        test_acc = test_classifier(net, classifier, test_loader)  # test classifier on test set (unseen data)
-        train_acc_history.append(train_acc)
-        test_acc_history.append(test_acc)
-
-        print('epoch: ', epoch, '. classifier training acc: ', train_acc, '. classifier test acc: ', test_acc)
-        wandb.log({
-            'classifier train acc': train_acc,
-            'classifier test acc': test_acc
-        })
-
-        torch.save(net.state_dict(), 'train_acc' + str(train_acc) + 'test_acc' + str(train_acc) + 'readout.pth')
-
-fig, axs = plt.subplots(1, 2, figsize=(10, 4))
-axs[0].plot(total_errors)
-axs[0].set_title('Total Errors on training set')
-axs[1].plot(total_errors_test)
-axs[1].set_title('Total Errors on test set')
-plt.tight_layout()
 plt.show()
 
-
+# %%
+generate_rdm(trained_net, test_loader, 5000, True)

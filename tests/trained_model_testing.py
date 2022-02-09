@@ -1,9 +1,7 @@
-# %%
+'''
+This script tests trained models
+'''
 
-"""
-pytorch implementation of deep hebbian predictive coding(DHPC) net that enables relatively flexible maniputation of network architecture
-code inspired by Matthias's code of PCtorch
-"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,11 +10,15 @@ import scipy
 import math
 import matplotlib
 import matplotlib.pyplot as plt
+import torchvision
+from torch.utils import data
+from torch.utils.data import Subset, DataLoader
+from torch.autograd import Variable
 from sklearn.metrics import pairwise_distances  # computes the pairwise distance between observations
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import pickle
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn import linear_model
 
@@ -36,10 +38,22 @@ dtype = torch.float  # Set standard datatype
 # helper functions
 ###########################
 
+#  sigmoid activation function
 def sigmoid(inputs):
     inputs = inputs - 3
     m = nn.Sigmoid()
     return m(inputs)
+
+
+#  pytorch logistic regression
+class LogisticRegression(torch.nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(LogisticRegression, self).__init__()
+        self.linear = torch.nn.Linear(input_dim, output_dim)
+
+    def forward(self, x):
+        outputs = self.linear(x)
+        return outputs
 
 
 # %%
@@ -55,11 +69,6 @@ class PredLayer(nn.Module):
         super(PredLayer, self).__init__()  # super().__init__()
         self.layer_size = layer_size  # num of units in this layer
         self.out_size = out_size  # num of units in next layer for constructution of weight matrix
-
-        # self.e_activation = torch.zeros((layer_size))  # activation level of e units
-        # self.r_activation = torch.zeros((layer_size))  # activation level of r units
-        # self.r_output = torch.zeros((layer_size))  # output firing rates of r units
-        # self.r_prediction = torch.zeros((layer_size))  # prediction imposed by higher layer
 
         self.infRate = inf_rate  # inference rate governing how fast r adjust to errors
         self.actFunc = act_func  # activation function
@@ -99,7 +108,7 @@ class PredLayer(nn.Module):
 class input_layer(PredLayer):
     # Additional class for the input layer. This layer does not use a full inference step (driven only by input).
     def forward(self, inputs, nextlayer_r_out):
-        e_act = inputs - torch.matmul(self.weights, nextlayer_r_out)
+        e_act = inputs.to(device) - torch.matmul(self.weights, nextlayer_r_out)
         return e_act
 
 
@@ -240,20 +249,21 @@ def test_frame(model, test_data, inference_steps):
     plt.show()
 
 
-def generate_rdm(model, test_sequences, inference_steps, plot=False):
+def generate_rdm(model, data_loader, inf_steps,
+                 plot=True):  # generate rdm to inspect learned high level representation with either train or test data
     # test sequence include all frames of tested sequences
-    sequences = len(test_sequences)
-    frames = len(test_sequences[0])
-
     representation = []  # array containing representation from highest layer
+    labels = []
 
-    for seq in range(sequences):
-        for frame in range(frames):
-            model.init_states()  # initialise states between each frame
-            model.forward(test_sequences[seq, frame, :], inference_steps)
-            representation.append(model.states['r_activation'][-1].detach().numpy())
+    for i, (_image, _label) in enumerate(data_loader):
+        representation.append(high_level_rep(model, torch.flatten(_image), inf_steps))
+        labels.append(_label)
 
-    pair_dist_cosine = pairwise_distances(representation, metric='cosine')
+    sorted_label, indices = torch.sort(torch.tensor(labels))
+    representation = torch.stack(representation)
+    representation = representation[indices]
+
+    pair_dist_cosine = pairwise_distances(representation.cpu(), metric='cosine')
 
     if plot:
         fig, ax = plt.subplots()
@@ -262,7 +272,11 @@ def generate_rdm(model, test_sequences, inference_steps, plot=False):
         ax.set_title('RDM cosine')
         plt.show()
 
-    return representation
+
+def high_level_rep(model, image, inference_steps):
+    model.init_states()
+    model.forward(torch.flatten(image), inference_steps)
+    return model.states['r_activation'][-1].detach()
 
 
 # %%
@@ -310,99 +324,138 @@ def test_accuracy(model, test_data):
     return cumulative_accuracy
 
 
-# %%
-#  data preprocessing
-data = torch.tensor(np.load('data/translationData.npy'), device=device)  # [samples, sequencelength, dim_x, dim_y]
-flat_data = torch.flatten(data, 2, 3)
-flat_data = flat_data.to(device)
-dataWidth = data.shape[-1]
+def train_classifier(model, reg_classifier,
+                     data_loader):  # take network, classifier, and training data as input, return trained classifier
+    train_x = []  # contains last layer representations learned from training data
+    train_y = []  # contains labels in training data
+    for i, (_image, _label) in enumerate(data_loader):
+        train_x.append(high_level_rep(model, torch.flatten(_image), 5000))
+        train_y.append(_label)
 
-# %%
-# data visualisation
-# fig, axs = plt.subplots(6, 1, sharex=True, sharey=True)
-# for i in range(len(data[1, :, :, :])):
-#     axs[i].imshow(data[1, i, :, :])
-# plt.show()
+    print('finished learning, start training classifier')
+    train_x, train_y = torch.stack(train_x), torch.cat(train_y)
+    dataset = data.TensorDataset(train_x, train_y)
+    dataloader_classify = DataLoader(dataset, shuffle=True)
+    loss_log = []
 
-# %%
-###########################
-### Training loop
-###########################
+    reg_classifier.train()
+    for _epoch in range(200):
+        loss_epoch = []
+        for i, (_image, _label) in enumerate(dataloader_classify):
+            optimizer.zero_grad()
+            outputs = reg_classifier(_image.to(device))
+            loss = criterion(outputs, _label.to(device))
+            loss_epoch.append(loss.item())
+            loss.backward()
+            optimizer.step()
+        loss_log.append(np.mean(loss_epoch))
 
-with torch.no_grad():  # turn off auto grad function
-
-    # Hyperparameters for training
-    inference_steps = 10
-    epochs = 5
-    cycles_per_frame = 5
-    cycles_per_sequence = 10
-
-    #  network instantiation
-    network_architecture = [dataWidth ** 2, 2000, 500, 30]
-    inf_rates = [.05, .05, .05, .05]
-
-    net = DHPC(network_architecture, inf_rates)
-    net.to(device)
-
-    sequences = len(flat_data)
-    frames = len(flat_data[0])
-
-    total_errors = []
-    acc_history = []
-
-    for epoch in range(epochs):
-        error_per_seq = []
-        for seq in range(sequences):  # for each sequence
-            net.init_states()
-            for s in range(cycles_per_sequence):  # several cycles per sequence
-                for frame in range(frames):  # for each frame
-                    for f in range(cycles_per_frame):  # several cycles per frame
-                        data = flat_data[seq, frame, :]
-                        net(data, inference_steps)
-                        net.learn()
-            error_per_seq.append(net.total_error())
-
-        total_errors.append(np.mean(error_per_seq))
-        acc = test_accuracy(net, flat_data)
-        acc_history.append(acc)
-
-        print('epoch: ', epoch, '. classification acc: ', acc)
-
-    fig, axs = plt.subplots(1, 2)
-    axs[0].plot(total_errors)
-    axs[0].set_title('Total Errors')
-    axs[1].plot(acc_history)
-    axs[1].set_title('Classification accuracy')
+    fig, ax = plt.subplots()
+    plt.plot(loss_log)
+    plt.title('classifier loss training')
     plt.show()
 
+    with torch.no_grad():
+        reg_classifier.eval()
+        correct = []
+        total = 0
+        for i, (_image, _label) in enumerate(dataloader_classify):
+            _output = reg_classifier(_image.to(device))
+            _, predicted = torch.max(F.softmax(_output), 1)
+            correct += (predicted.cpu() == train_y[i])
+            total += 1
+
+        _acc = np.sum(correct) / total  # prediction acc of trained classifier
+
+    return _acc
+
+
+def test_classifier(model, reg_classifier, data_loader):
+    test_x = []  # contains last layer representations generated from test data
+    test_y = []  # contains labels in test data
+
+    for i, (_image, _label) in enumerate(data_loader):
+        test_x.append(high_level_rep(model, torch.flatten(_image), 5000))
+        test_y.append(_label)
+
+    print('testing classifier')
+    test_x, test_y = torch.stack(test_x), torch.cat(test_y)
+    dataset = data.TensorDataset(test_x, test_y)
+    dataloader_classify = DataLoader(dataset, shuffle=True)
+
+    with torch.no_grad():
+        reg_classifier.eval()
+        correct = []
+        total = 0
+        for i, (_image, _label) in enumerate(dataloader_classify):
+            _output = reg_classifier(_image.to(device))
+            _, predicted = torch.max(F.softmax(_output), 1)
+            correct += (predicted.cpu() == test_y[i])
+            total += 1
+
+        _acc = np.sum(correct) / total  # prediction acc of trained classifier with test dataset
+
+    return _acc
+
+
 # %%
-# test_accuracy(net, flat_data)
+#  data preprocessing
 
-generate_rdm(net, flat_data, 1000, plot=True)
-#  register_forward_hook can be used to inspect internal activation
+full_mnist = torchvision.datasets.MNIST(
+    root="/Users/lucyzhang/Documents/research/PC_net/data",
+    train=True,
+    download=True,
+    transform=torchvision.transforms.ToTensor()
+)
 
 # %%
-# examine the correlation between activation level and frame in sequence
 
-# visualise one sequence
-fig, axs = plt.subplots(1, 6, sharey=True)
-for i in range(6):
-    axs[i].imshow(np.reshape(flat_data[0, i, :], (34, 34)))
+### genearte train test files for digit classification
+
+indices = np.arange(len(full_mnist))
+train_indices, test_indices = train_test_split(indices, train_size=50 * 10, test_size=10 * 10,
+                                               stratify=full_mnist.targets)
+
+# Warp into Subsets and DataLoaders
+train_dataset = Subset(full_mnist, train_indices)
+test_dataset = Subset(full_mnist, test_indices)
+
+dataWidth = train_dataset[0][0].shape[1]
+numClass = 10  # number of classes in mnist
+# %%
+
+train_loader = DataLoader(train_dataset, shuffle=True)
+test_loader = DataLoader(test_dataset, shuffle=True)
+
+# %%
+# load trained model
+# Hyperparameters for training
+inference_steps = 100
+epochs = 200
+
+#  network instantiation
+network_architecture = [dataWidth ** 2, 2000, 500, 30]
+inf_rates = [.1, .07, .05, .03]
+per_im_repeat = 1
+
+trained_net = DHPC(network_architecture, inf_rates)
+trained_net.load_state_dict(torch.load('/Users/lucyzhang/Documents/research/PC_net/results/trained_model/epochs200infsteps100infrate[0.1, 0.07, 0.05, 0.03]lr0.05-readout-4layer.pth', map_location=device))
+trained_net.eval()
+
+#  initialising classifier
+classifier = LogisticRegression(network_architecture[-1], 10)
+criterion = torch.nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(classifier.parameters(), lr=.01)
+classifier.to(device)
+
+# %%
+# distribution of trained weights
+
+fig, axs = plt.subplots(1, len(network_architecture)-1, figsize=(12, 4))
+for i in range(len(network_architecture)-1):
+    axs[i].hist(trained_net.layers[i].weights)
 
 plt.show()
 
 # %%
-# generate highest layer representations for highest layer [6, 30] > reshape to [30, 6]
-# plot in 30 graphs activation of each unit in relation to position
-representations = generate_rdm(net, flat_data, 1000, plot=True)
-# %%
-rep_seq = representations[12:18]
-rep_seq = np.transpose(rep_seq)
-fig, axs = plt.subplots(5, 6, sharex=True, sharey=True)
-x = np.arange(6)
-count = 0
-for i in range(5):
-    for j in range(6):
-        axs[i][j].plot(x, rep_seq[count, :])
-        count += 1
-plt.show()
+generate_rdm(trained_net, test_loader, 5000, True)

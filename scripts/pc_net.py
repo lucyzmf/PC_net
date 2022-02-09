@@ -258,7 +258,7 @@ net = PC_Net(network_dimensions, inf_rates, lr=learningRate)
 # training loop
 #############################
 
-epochNum = 10
+epochNum = 20
 repNum = 10  # num of times a sequence is repeated before moving to next sequence
 frameRep = 5  # num of times of repeat per frame
 

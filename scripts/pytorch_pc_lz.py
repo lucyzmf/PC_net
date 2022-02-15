@@ -87,7 +87,7 @@ class PredLayer(nn.Module):
     def reset_parameters(self) -> None:  # initialise or reset layer weight
         nn.init.normal_(self.weights, 0, 0.5)  # normal distribution
         self.weights = torch.clamp(self.weights, min=0)  # weights clamped to above 0
-        self.weights = self.weights / self.out_size  # normalise weights given next layer size
+        self.weights = self.weights / self.layer_size  # normalise weights given next layer size
 
     # def reset_state(self):
     # reinitialise activation and output values
@@ -277,6 +277,8 @@ def generate_rdm(model, data_loader, inf_steps,
         ax.set_title('RDM cosine')
         plt.show()
 
+    return representation, labels  # these have been sorted by class label
+
 
 def high_level_rep(model, image, inference_steps):
     model.init_states()
@@ -286,30 +288,23 @@ def high_level_rep(model, image, inference_steps):
 
 # %%
 # test function: takes the model, generates highest level representations, use KNN to classify
-def test_accuracy(model, test_data):
-    rep_list = generate_rdm(model, test_data, 1000, plot=False)
-    label_list = []  # List with correct class labels
-    for i in range(test_data.shape[0]):  # Iterate through sequences
-        for j in range(test_data.shape[1]):  # Iterate through frames in each sequence
-            label_list.append(i)  # Append the label (from 0 to 9)
-    labels = np.stack(label_list, axis=0)
-    reps = np.stack(rep_list, axis=0)
+def test_accuracy(model, data_loader):
+    rep_list, labels = generate_rdm(model, data_loader, 10, plot=False)
+    labels = np.array(labels)
 
-    # Select two samples of each class as test set, classify with knn (k = 3)
-    skf = StratifiedKFold(n_splits=3)  # with six instances per class, each of the three folds contains two
-    skf.get_n_splits(reps, labels)
+    # Select two samples of each class as test set, classify with knn (k = 5)
+    skf = StratifiedKFold(n_splits=5, shuffle=True)  # split into 5 folds
+    skf.get_n_splits(rep_list, labels)
+    # sample_size = len(data_loader)
     cumulative_accuracy = 0
     # Now iterate through all folds
-    for train_index, test_index in skf.split(reps, labels):
+    for train_index, test_index in skf.split(rep_list, labels):
         # print("TRAIN:", train_index, "TEST:", test_index)
-        reps_train, reps_test = reps[train_index], reps[test_index]
+        reps_train, reps_test = rep_list[train_index], rep_list[test_index]
         labels_train, labels_test = labels[train_index], labels[test_index]
-        labels_train_vec = np.zeros([40, 10])
-        labels_test_vec = np.zeros([20, 10])
-        for i in range(40):
-            labels_train_vec[i, math.floor(i / 4)] = 1
-        for i in range(20):
-            labels_test_vec[i, math.floor(i / 2)] = 1
+        labels_train_vec = F.one_hot(torch.tensor(labels_train)).numpy()
+        labels_test_vec = F.one_hot(torch.tensor(labels_test)).numpy()
+
         # neigh = KNeighborsClassifier(n_neighbors=3, metric = distance) # build  KNN classifier for this fold
         # neigh.fit(reps_train, labels_train) # Use training data for KNN classifier
         # labels_predicted = neigh.predict(reps_test) # Predictions across test set
@@ -323,8 +318,8 @@ def test_accuracy(model, test_data):
 
         # Calculate accuracy on test set: put test set into model, calculate fraction of TP+TN over all responses
         accuracy = accuracy_score(labels_test_vec, labels_predicted)
-        # https://www.svds.com/the-basics-of-classifier-evaluation-part-1/
-        cumulative_accuracy += accuracy / 3
+
+        cumulative_accuracy += accuracy / 5
 
     return cumulative_accuracy
 
@@ -445,8 +440,8 @@ wandb.init(project="DHPC", entity="lucyzmf")
 
 config = wandb.config
 config.infstep = 100
-config.epoch = 100
-config.infrate = [.1, .07, .05, .03]
+config.epoch = 5
+config.infrate = [.1, .07, .05, .05]
 config.lr = .05
 
 # Hyperparameters for training
@@ -488,6 +483,10 @@ for epoch in range(epochs):
         net.learn()
         errors.append(net.total_error())
         last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
+        wandb.log({
+            'last layer activation': wandb.Histogram(net.states['r_activation'][-1].detach().cpu()),
+            'layer n-1 weights': wandb.Histogram(net.layers[-2].weights.detach().cpu())
+        })
 
     total_errors.append(np.mean(errors))  # mean error per epoch
     last_layer_act_log.append(np.mean(last_layer_act))  # mean last layer activation per epoch
@@ -498,7 +497,7 @@ for epoch in range(epochs):
         'avg last layer act': last_layer_act_log[-1]
     })
 
-    if epoch % 10 == 0:
+    if epoch % 1 == 0:
         errors_test = []
         for i, (image, label) in enumerate(test_loader):
             net.init_states()
@@ -513,23 +512,23 @@ for epoch in range(epochs):
             'test_error': total_errors_test[-1]
         })
 
-    if (epoch == 0) or (epoch == epochs/2) or (epoch == epochs - 1):
-        # train classifier using training data
-        train_acc = train_classifier(net, classifier, train_loader, 1)
-        print(train_acc)
-
-        # test classification acc at the end of each epoch
-        test_acc = test_classifier(net, classifier, test_loader)  # test classifier on test set (unseen data)
-        train_acc_history.append(train_acc)
-        test_acc_history.append(test_acc)
-
-        print('epoch: ', epoch, '. classifier training acc: ', train_acc, '. classifier test acc: ', test_acc)
-        wandb.log({
-            'classifier train acc': train_acc,
-            'classifier test acc': test_acc
-        })
-
-        torch.save(net.state_dict(), 'train_acc' + str(train_acc) + 'test_acc' + str(train_acc) + 'readout.pth')
+    # if (epoch == 0) or (epoch == epochs/2) or (epoch == epochs - 1):
+    #     # train classifier using training data
+    #     train_acc = train_classifier(net, classifier, train_loader, 1)
+    #     print(train_acc)
+    #
+    #     # test classification acc at the end of each epoch
+    #     test_acc = test_classifier(net, classifier, test_loader)  # test classifier on test set (unseen data)
+    #     train_acc_history.append(train_acc)
+    #     test_acc_history.append(test_acc)
+    #
+    #     print('epoch: ', epoch, '. classifier training acc: ', train_acc, '. classifier test acc: ', test_acc)
+    #     wandb.log({
+    #         'classifier train acc': train_acc,
+    #         'classifier test acc': test_acc
+    #     })
+    #
+    #     torch.save(net.state_dict(), 'train_acc' + str(train_acc) + 'test_acc' + str(train_acc) + 'readout.pth')
 
 fig, axs = plt.subplots(1, 2, figsize=(10, 4))
 axs[0].plot(total_errors)

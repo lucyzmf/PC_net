@@ -289,7 +289,7 @@ def high_level_rep(model, image, inference_steps):
 # %%
 # test function: takes the model, generates highest level representations, use KNN to classify
 def test_accuracy(model, data_loader):
-    rep_list, labels = generate_rdm(model, data_loader, 10, plot=False)
+    rep_list, labels = generate_rdm(model, data_loader, 1000, plot=False)
     labels = np.array(labels)
 
     # Select two samples of each class as test set, classify with knn (k = 5)

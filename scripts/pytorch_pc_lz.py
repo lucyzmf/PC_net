@@ -254,8 +254,7 @@ def test_frame(model, test_data, inference_steps):
     plt.show()
 
 
-def generate_rdm(model, data_loader, inf_steps,
-                 plot=True):  # generate rdm to inspect learned high level representation with either train or test data
+def generate_rdm(model, data_loader, inf_steps):  # generate rdm to inspect learned high level representation with either train or test data
     # test sequence include all frames of tested sequences
     representation = []  # array containing representation from highest layer
     labels = []
@@ -270,14 +269,13 @@ def generate_rdm(model, data_loader, inf_steps,
 
     pair_dist_cosine = pairwise_distances(representation.cpu(), metric='cosine')
 
-    if plot:
-        fig, ax = plt.subplots()
-        im = ax.imshow(pair_dist_cosine)
-        fig.colorbar(im, ax=ax)
-        ax.set_title('RDM cosine')
-        plt.show()
+    fig, ax = plt.subplots()
+    im = ax.imshow(pair_dist_cosine)
+    fig.colorbar(im, ax=ax)
+    ax.set_title('RDM cosine')
+    plt.show()
 
-    return representation, labels  # these have been sorted by class label
+    return representation, labels, fig  # these have been sorted by class label
 
 
 def high_level_rep(model, image, inference_steps):
@@ -289,7 +287,7 @@ def high_level_rep(model, image, inference_steps):
 # %%
 # test function: takes the model, generates highest level representations, use KNN to classify
 def test_accuracy(model, data_loader):
-    rep_list, labels = generate_rdm(model, data_loader, 1000, plot=False)
+    rep_list, labels, _ = generate_rdm(model, data_loader, 10)
     labels = np.array(labels)
 
     # Select two samples of each class as test set, classify with knn (k = 5)
@@ -440,7 +438,7 @@ wandb.init(project="DHPC", entity="lucyzmf")
 
 config = wandb.config
 config.infstep = 100
-config.epoch = 5
+config.epoch = 1
 config.infrate = [.1, .07, .05, .05]
 config.lr = .05
 
@@ -484,7 +482,7 @@ for epoch in range(epochs):
         errors.append(net.total_error())
         last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
         wandb.log({
-            'last layer activation': wandb.Histogram(net.states['r_activation'][-1].detach().cpu()),
+            'last layer activation distribution': wandb.Histogram(net.states['r_activation'][-1].detach().cpu()),
             'layer n-1 weights': wandb.Histogram(net.layers[-2].weights.detach().cpu())
         })
 
@@ -497,7 +495,7 @@ for epoch in range(epochs):
         'avg last layer act': last_layer_act_log[-1]
     })
 
-    if epoch % 1 == 0:
+    if epoch % 5 == 0:
         errors_test = []
         for i, (image, label) in enumerate(test_loader):
             net.init_states()
@@ -507,10 +505,15 @@ for epoch in range(epochs):
         print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
                                                                                             last_layer_act_log[-1]), )
         print('total error on test set: %.4f' % (total_errors_test[-1]))
+        reg_acc_train = test_accuracy(net, train_loader)
+        reg_acc_test = test_accuracy(net, test_loader)
 
         wandb.log({
-            'test_error': total_errors_test[-1]
+            'test_error': total_errors_test[-1],
+            'reg acc on train set': reg_acc_train,
+            'reg acc on test set': reg_acc_test
         })
+
 
     # if (epoch == 0) or (epoch == epochs/2) or (epoch == epochs - 1):
     #     # train classifier using training data
@@ -538,4 +541,9 @@ axs[1].set_title('Total Errors on test set')
 plt.tight_layout()
 plt.show()
 
+# %%
+_, _, fig_train = generate_rdm(net, train_loader, 10)
+wandb.log({'rdm train data': wandb.Image(fig_train)})
+_, _, fig_test = generate_rdm(net, test_loader, 10)
+wandb.log({'rdm test data': wandb.Image(fig_test)})
 

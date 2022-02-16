@@ -273,7 +273,7 @@ def generate_rdm(model, data_loader, inf_steps):  # generate rdm to inspect lear
     im = ax.imshow(pair_dist_cosine)
     fig.colorbar(im, ax=ax)
     ax.set_title('RDM cosine')
-    plt.show()
+    # plt.show()
 
     return representation, labels, fig  # these have been sorted by class label
 
@@ -289,6 +289,7 @@ def high_level_rep(model, image, inference_steps):
 def test_accuracy(model, data_loader):
     rep_list, labels, _ = generate_rdm(model, data_loader, 10)
     labels = np.array(labels)
+    # print(labels)
 
     # Select two samples of each class as test set, classify with knn (k = 5)
     skf = StratifiedKFold(n_splits=5, shuffle=True)  # split into 5 folds

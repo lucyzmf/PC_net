@@ -202,6 +202,23 @@ class DHPC(nn.Module):
             total.append(error)
         return torch.mean(torch.tensor(total))
 
+    def reconstruct(self, image, label, infsteps): # reconstruct from second layer output
+        self.init_states()
+        self.forward(torch.flatten(image), infsteps)
+        label = label.item()
+        error = self.total_error()
+
+        reconstructed_frame = self.layers[0].weights @ self.states['r_output'][1]
+        reconstructed_frame = reconstructed_frame.detach().numpy()
+        img_width = int(np.sqrt(len(reconstructed_frame)))
+
+        fig, ax = plt.subplots()
+        im = ax.imshow(np.reshape(reconstructed_frame, (img_width, img_width)))
+        ax.set_title('reconstruction digit %i error %f' % (label, error.item()))
+        # plt.show()
+
+        return error, fig
+
 
 # %%
 ###########################
@@ -438,9 +455,9 @@ torch.save(test_loader, '/Users/lucyzhang/Documents/research/PC_net/data/test_lo
 wandb.init(project="DHPC", entity="lucyzmf")
 
 config = wandb.config
-config.infstep = 100
-config.epoch = 1
-config.infrate = [.1, .07, .05, .05]
+config.infstep = 1
+config.epoch = 11
+config.infrate = [.1, .07, .05]
 config.lr = .05
 
 # Hyperparameters for training
@@ -448,7 +465,7 @@ inference_steps = config.infstep
 epochs = config.epoch
 
 #  network instantiation
-network_architecture = [dataWidth ** 2, 2000, 500, 30]
+network_architecture = [dataWidth ** 2, 1000, 50]
 inf_rates = config.infrate
 per_im_repeat = 1
 
@@ -470,6 +487,11 @@ last_layer_act_log = []
 train_acc_history = []
 test_acc_history = []  # acc on test set at the end of each epoch
 
+# sample image and label to test reconstruction
+for test_images, test_labels in test_loader:
+    sample_image = test_images[0]    # Reshape them according to your needs.
+    sample_label = test_labels[0]
+
 for epoch in range(epochs):
 
     errors = []  # log total error per sample in dataset
@@ -484,7 +506,9 @@ for epoch in range(epochs):
         last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
         wandb.log({
             'last layer activation distribution': wandb.Histogram(net.states['r_activation'][-1].detach().cpu()),
-            'layer n-1 weights': wandb.Histogram(net.layers[-2].weights.detach().cpu())
+            'last layer output distribution': wandb.Histogram(net.states['r_output'][-1].detach().cpu()),
+            'layer n-1 weights': wandb.Histogram(net.layers[-2].weights.detach().cpu()),
+            'layer n-1 output distribution': wandb.Histogram(net.states['r_output'][-2].detach().cpu())
         })
 
     total_errors.append(np.mean(errors))  # mean error per epoch
@@ -496,7 +520,8 @@ for epoch in range(epochs):
         'avg last layer act': last_layer_act_log[-1]
     })
 
-    if epoch % 5 == 0:
+    if (epoch % 10 == 0) and (epoch != 0):
+        # test classification
         errors_test = []
         for i, (image, label) in enumerate(test_loader):
             net.init_states()
@@ -514,6 +539,11 @@ for epoch in range(epochs):
             'reg acc on train set': reg_acc_train,
             'reg acc on test set': reg_acc_test
         })
+
+        # sample reconstruction
+        recon_error, fig = net.reconstruct(sample_image, sample_label, 10)
+        wandb.log({'reconstructed image': wandb.Image(fig)})
+
 
 
     # if (epoch == 0) or (epoch == epochs/2) or (epoch == epochs - 1):

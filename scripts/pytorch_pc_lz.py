@@ -178,6 +178,7 @@ class DHPC(nn.Module):
         e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
         layers = self.layers
         r_act[0] = frame  # r units of first layer reflect input
+        r_out[0] = layers[0].actFunc(r_act[0])
 
         # inference process
         for i in range(inference_steps):
@@ -209,7 +210,7 @@ class DHPC(nn.Module):
         error = self.total_error()
 
         reconstructed_frame = self.layers[0].weights @ self.states['r_output'][1]
-        reconstructed_frame = reconstructed_frame.detach().numpy()
+        reconstructed_frame = reconstructed_frame.detach().cpu().numpy()
         img_width = int(np.sqrt(len(reconstructed_frame)))
 
         fig, ax = plt.subplots()
@@ -283,6 +284,7 @@ def generate_rdm(model, data_loader, inf_steps):  # generate rdm to inspect lear
     sorted_label, indices = torch.sort(torch.tensor(labels))
     representation = torch.stack(representation)
     representation = representation[indices]
+    labels = torch.cat(labels)
 
     pair_dist_cosine = pairwise_distances(representation.cpu(), metric='cosine')
 
@@ -290,7 +292,7 @@ def generate_rdm(model, data_loader, inf_steps):  # generate rdm to inspect lear
     im = ax.imshow(pair_dist_cosine)
     fig.colorbar(im, ax=ax)
     ax.set_title('RDM cosine')
-    # plt.show()
+#     plt.show()
 
     return representation, labels, fig  # these have been sorted by class label
 
@@ -305,8 +307,9 @@ def high_level_rep(model, image, inference_steps):
 # test function: takes the model, generates highest level representations, use KNN to classify
 def test_accuracy(model, data_loader):
     rep_list, labels, _ = generate_rdm(model, data_loader, 10)
+    rep_list = rep_list.cpu()
     labels = np.array(labels)
-    # print(labels)
+#     print(labels)
 
     # Select two samples of each class as test set, classify with knn (k = 5)
     skf = StratifiedKFold(n_splits=5, shuffle=True)  # split into 5 folds
@@ -338,6 +341,7 @@ def test_accuracy(model, data_loader):
         cumulative_accuracy += accuracy / 5
 
     return cumulative_accuracy
+
 
 
 def train_classifier(model, reg_classifier,

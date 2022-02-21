@@ -37,7 +37,6 @@ dtype = torch.float  # Set standard datatype
 ###########################
 # helper functions
 ###########################
-
 #  sigmoid activation function
 def sigmoid(inputs):
     inputs = inputs - 3
@@ -82,7 +81,7 @@ class PredLayer(nn.Module):
     def reset_parameters(self) -> None:  # initialise or reset layer weight
         nn.init.normal_(self.weights, 0, 0.5)  # normal distribution
         self.weights = torch.clamp(self.weights, min=0)  # weights clamped to above 0
-        self.weights = self.weights / self.out_size  # normalise weights given next layer size
+        self.weights = self.weights / self.layer_size  # normalise weights given next layer size
 
     # def reset_state(self):
     # reinitialise activation and output values
@@ -128,7 +127,7 @@ class output_layer(PredLayer):
 # whenever forward pass is called, reads state dict first, then do computation
 
 class DHPC(nn.Module):
-    def __init__(self, network_arch, inf_rates):
+    def __init__(self, network_arch, inf_rates, lr):
         super().__init__()
         e_act, r_act, r_out = [], [], []  # a list that always keep tracks of internal state values
         self.layers = nn.ModuleList()  # create module list containing all layers
@@ -144,15 +143,17 @@ class DHPC(nn.Module):
                 # add input layer to module list, add input layer state list
                 e_act.append(torch.zeros(network_arch[layer]).to(device))
                 self.layers.append(
-                    input_layer(network_arch[0], network_arch[1], inf_rates[0]))  # append input layer to modulelist
+                    input_layer(network_arch[0], network_arch[1], inf_rates[0],
+                                lr_rate=lr))  # append input layer to modulelist
             elif layer != len(network_arch) - 1:
                 # add middle layer to module list and state list
                 e_act.append(torch.zeros(network_arch[layer]).to(device))  # tensor containing activation of error units
-                self.layers.append(PredLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer]))
+                self.layers.append(
+                    PredLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer], lr_rate=lr))
             else:
                 # add output layer to module list
                 e_act.append(None)
-                self.layers.append(output_layer(network_arch[layer], network_arch[layer], inf_rates[layer]))
+                self.layers.append(output_layer(network_arch[layer], network_arch[layer], inf_rates[layer], lr_rate=lr))
 
         self.states = {
             'error': e_act,
@@ -173,6 +174,7 @@ class DHPC(nn.Module):
         e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
         layers = self.layers
         r_act[0] = frame  # r units of first layer reflect input
+        r_out[0] = layers[0].actFunc(r_act[0])
 
         # inference process
         for i in range(inference_steps):
@@ -196,6 +198,23 @@ class DHPC(nn.Module):
             error = torch.mean(torch.pow(self.states['error'][i], 2))
             total.append(error)
         return torch.mean(torch.tensor(total))
+
+    def reconstruct(self, image, label, infsteps):  # reconstruct from second layer output
+        self.init_states()
+        self.forward(torch.flatten(image), infsteps)
+        label = label.item()
+        error = self.total_error()
+
+        reconstructed_frame = self.layers[0].weights @ self.states['r_output'][1]
+        reconstructed_frame = reconstructed_frame.detach().cpu().numpy()
+        img_width = int(np.sqrt(len(reconstructed_frame)))
+
+        fig, ax = plt.subplots()
+        im = ax.imshow(np.reshape(reconstructed_frame, (img_width, img_width)))
+        ax.set_title('reconstruction digit %i error %f' % (label, error.item()))
+        # plt.show()
+
+        return error, fig
 
 
 # %%
@@ -249,8 +268,8 @@ def test_frame(model, test_data, inference_steps):
     plt.show()
 
 
-def generate_rdm(model, data_loader, inf_steps,
-                 plot=True):  # generate rdm to inspect learned high level representation with either train or test data
+def generate_rdm(model, data_loader,
+                 inf_steps):  # generate rdm to inspect learned high level representation with either train or test data
     # test sequence include all frames of tested sequences
     representation = []  # array containing representation from highest layer
     labels = []
@@ -262,15 +281,17 @@ def generate_rdm(model, data_loader, inf_steps,
     sorted_label, indices = torch.sort(torch.tensor(labels))
     representation = torch.stack(representation)
     representation = representation[indices]
+    labels = torch.cat(labels)
 
     pair_dist_cosine = pairwise_distances(representation.cpu(), metric='cosine')
 
-    if plot:
-        fig, ax = plt.subplots()
-        im = ax.imshow(pair_dist_cosine)
-        fig.colorbar(im, ax=ax)
-        ax.set_title('RDM cosine')
-        plt.show()
+    fig, ax = plt.subplots()
+    im = ax.imshow(pair_dist_cosine)
+    fig.colorbar(im, ax=ax)
+    ax.set_title('RDM cosine')
+    #     plt.show()
+
+    return representation, labels, fig  # these have been sorted by class label
 
 
 def high_level_rep(model, image, inference_steps):
@@ -281,30 +302,25 @@ def high_level_rep(model, image, inference_steps):
 
 # %%
 # test function: takes the model, generates highest level representations, use KNN to classify
-def test_accuracy(model, test_data):
-    rep_list = generate_rdm(model, test_data, 1000, plot=False)
-    label_list = []  # List with correct class labels
-    for i in range(test_data.shape[0]):  # Iterate through sequences
-        for j in range(test_data.shape[1]):  # Iterate through frames in each sequence
-            label_list.append(i)  # Append the label (from 0 to 9)
-    labels = np.stack(label_list, axis=0)
-    reps = np.stack(rep_list, axis=0)
+def test_accuracy(model, data_loader):
+    rep_list, labels, _ = generate_rdm(model, data_loader, 10)
+    rep_list = rep_list.cpu()
+    labels = np.array(labels)
+    #     print(labels)
 
-    # Select two samples of each class as test set, classify with knn (k = 3)
-    skf = StratifiedKFold(n_splits=3)  # with six instances per class, each of the three folds contains two
-    skf.get_n_splits(reps, labels)
+    # Select two samples of each class as test set, classify with knn (k = 5)
+    skf = StratifiedKFold(n_splits=5, shuffle=True)  # split into 5 folds
+    skf.get_n_splits(rep_list, labels)
+    # sample_size = len(data_loader)
     cumulative_accuracy = 0
     # Now iterate through all folds
-    for train_index, test_index in skf.split(reps, labels):
+    for train_index, test_index in skf.split(rep_list, labels):
         # print("TRAIN:", train_index, "TEST:", test_index)
-        reps_train, reps_test = reps[train_index], reps[test_index]
+        reps_train, reps_test = rep_list[train_index], rep_list[test_index]
         labels_train, labels_test = labels[train_index], labels[test_index]
-        labels_train_vec = np.zeros([40, 10])
-        labels_test_vec = np.zeros([20, 10])
-        for i in range(40):
-            labels_train_vec[i, math.floor(i / 4)] = 1
-        for i in range(20):
-            labels_test_vec[i, math.floor(i / 2)] = 1
+        labels_train_vec = F.one_hot(torch.tensor(labels_train)).numpy()
+        labels_test_vec = F.one_hot(torch.tensor(labels_test)).numpy()
+
         # neigh = KNeighborsClassifier(n_neighbors=3, metric = distance) # build  KNN classifier for this fold
         # neigh.fit(reps_train, labels_train) # Use training data for KNN classifier
         # labels_predicted = neigh.predict(reps_test) # Predictions across test set
@@ -318,18 +334,19 @@ def test_accuracy(model, test_data):
 
         # Calculate accuracy on test set: put test set into model, calculate fraction of TP+TN over all responses
         accuracy = accuracy_score(labels_test_vec, labels_predicted)
-        # https://www.svds.com/the-basics-of-classifier-evaluation-part-1/
-        cumulative_accuracy += accuracy / 3
+
+        cumulative_accuracy += accuracy / 5
 
     return cumulative_accuracy
 
 
 def train_classifier(model, reg_classifier,
-                     data_loader):  # take network, classifier, and training data as input, return trained classifier
+                     data_loader,
+                     epochNum):  # take network, classifier, and training data as input, return trained classifier
     train_x = []  # contains last layer representations learned from training data
     train_y = []  # contains labels in training data
     for i, (_image, _label) in enumerate(data_loader):
-        train_x.append(high_level_rep(model, torch.flatten(_image), 5000))
+        train_x.append(high_level_rep(model, torch.flatten(_image), 3000))
         train_y.append(_label)
 
     print('finished learning, start training classifier')
@@ -339,7 +356,7 @@ def train_classifier(model, reg_classifier,
     loss_log = []
 
     reg_classifier.train()
-    for _epoch in range(200):
+    for _epoch in range(epochNum):
         loss_epoch = []
         for i, (_image, _label) in enumerate(dataloader_classify):
             optimizer.zero_grad()
@@ -361,7 +378,7 @@ def train_classifier(model, reg_classifier,
         total = 0
         for i, (_image, _label) in enumerate(dataloader_classify):
             _output = reg_classifier(_image.to(device))
-            _, predicted = torch.max(F.softmax(_output), 1)
+            _, predicted = torch.max(F.softmax(_output, dim=1), 1)
             correct += (predicted.cpu() == train_y[i])
             total += 1
 
@@ -375,7 +392,7 @@ def test_classifier(model, reg_classifier, data_loader):
     test_y = []  # contains labels in test data
 
     for i, (_image, _label) in enumerate(data_loader):
-        test_x.append(high_level_rep(model, torch.flatten(_image), 5000))
+        test_x.append(high_level_rep(model, torch.flatten(_image), 3000))
         test_y.append(_label)
 
     print('testing classifier')
@@ -389,7 +406,7 @@ def test_classifier(model, reg_classifier, data_loader):
         total = 0
         for i, (_image, _label) in enumerate(dataloader_classify):
             _output = reg_classifier(_image.to(device))
-            _, predicted = torch.max(F.softmax(_output), 1)
+            _, predicted = torch.max(F.softmax(_output, dim=1), 1)
             correct += (predicted.cpu() == test_y[i])
             total += 1
 
@@ -399,33 +416,16 @@ def test_classifier(model, reg_classifier, data_loader):
 
 
 # %%
-#  data preprocessing
-
-full_mnist = torchvision.datasets.MNIST(
-    root="/Users/lucyzhang/Documents/research/PC_net/data",
-    train=True,
-    download=True,
-    transform=torchvision.transforms.ToTensor()
-)
+#  load the training set used during training
+train_loader = torch.load(
+    '/Users/lucyzhang/Documents/research/PC_net/results/trained_model/twolayer_test2/train_loader.pth')
+test_loader = torch.load(
+    '/Users/lucyzhang/Documents/research/PC_net/results/trained_model/twolayer_test2/test_loader.pth')
 
 # %%
 
-### genearte train test files for digit classification
-
-indices = np.arange(len(full_mnist))
-train_indices, test_indices = train_test_split(indices, train_size=50 * 10, test_size=10 * 10,
-                                               stratify=full_mnist.targets)
-
-# Warp into Subsets and DataLoaders
-train_dataset = Subset(full_mnist, train_indices)
-test_dataset = Subset(full_mnist, test_indices)
-
-dataWidth = train_dataset[0][0].shape[1]
+dataWidth = 28  # width of mnist
 numClass = 10  # number of classes in mnist
-# %%
-
-train_loader = DataLoader(train_dataset, shuffle=True)
-test_loader = DataLoader(test_dataset, shuffle=True)
 
 # %%
 # load trained model
@@ -434,28 +434,83 @@ inference_steps = 100
 epochs = 200
 
 #  network instantiation
-network_architecture = [dataWidth ** 2, 2000, 500, 30]
-inf_rates = [.1, .07, .05, .03]
+network_architecture = [dataWidth ** 2, 100]
+inf_rates = [.1, .05]
+lr = .05
 per_im_repeat = 1
 
-trained_net = DHPC(network_architecture, inf_rates)
-trained_net.load_state_dict(torch.load('/Users/lucyzhang/Documents/research/PC_net/results/trained_model/epochs200infsteps100infrate[0.1, 0.07, 0.05, 0.03]lr0.05-readout-4layer.pth', map_location=device))
+trained_net = DHPC(network_architecture, inf_rates, lr)
+trained_net.load_state_dict(torch.load(
+    '/Users/lucyzhang/Documents/research/PC_net/results/trained_model/twolayer_test2/acc_train0.096acc_test0.1readout.pth',
+    map_location=device))
 trained_net.eval()
 
-#  initialising classifier
-classifier = LogisticRegression(network_architecture[-1], 10)
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(classifier.parameters(), lr=.01)
-classifier.to(device)
 
 # %%
 # distribution of trained weights
 
-fig, axs = plt.subplots(1, len(network_architecture)-1, figsize=(12, 4))
-for i in range(len(network_architecture)-1):
+fig, axs = plt.subplots(2, len(network_architecture) - 1, figsize=(12, 4))
+for i in range(len(network_architecture) - 1):
     axs[i].hist(trained_net.layers[i].weights)
 
 plt.show()
 
 # %%
-generate_rdm(trained_net, test_loader, 5000, True)
+# code from online
+classifier = LogisticRegression(100, 10)
+criterion = torch.nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(classifier.parameters(), lr=.001)
+classifier.to(device)
+
+# %%
+# generate representations using train and test images
+
+train_x = []  # contains last layer representations learned from training data
+train_y = []  # contains labels in training data
+for i, (_image, _label) in enumerate(train_loader):
+    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 100))
+    train_y.append(_label)
+train_x, train_y = torch.stack(train_x), torch.cat(train_y)
+dataset = data.TensorDataset(train_x, train_y)
+train_loader_rep = DataLoader(dataset, shuffle=True)
+
+
+train_x = []  # contains last layer representations learned from training data
+train_y = []  # contains labels in training data
+for i, (_image, _label) in enumerate(test_loader):
+    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 100))
+    train_y.append(_label)
+train_x, train_y = torch.stack(train_x), torch.cat(train_y)
+dataset = data.TensorDataset(train_x, train_y)
+test_loader_rep = DataLoader(dataset, shuffle=True)
+
+# %%
+# train and test classifier
+
+epochs = 100
+iter = 0
+for epoch in range(int(epochs)):
+    for i, (images, labels) in enumerate(train_loader_rep):
+        images = Variable(images.view(-1, 100))
+        labels = Variable(labels)
+
+        optimizer.zero_grad()
+        outputs = classifier(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        iter+=1
+        if iter%500==0:
+            # calculate Accuracy
+            correct = 0
+            total = 0
+            for images, labels in test_loader_rep:
+                images = Variable(images.view(-1, 100))
+                outputs = classifier(images)
+                _, predicted = torch.max(outputs.data, 1)
+                total+= labels.size(0)
+                # for gpu, bring the predicted and labels back to cpu fro python operations to work
+                correct+= (predicted == labels).sum()
+            accuracy = 100 * correct/total
+            print("Iteration: {}. Loss: {}. Accuracy: {}.".format(iter, loss.item(), accuracy))

@@ -293,6 +293,7 @@ def generate_rdm(model, data_loader,
 
     return representation, labels, fig  # these have been sorted by class label
 
+# %%
 
 def high_level_rep(model, image, inference_steps):
     model.init_states()
@@ -418,9 +419,9 @@ def test_classifier(model, reg_classifier, data_loader):
 # %%
 #  load the training set used during training
 train_loader = torch.load(
-    '/Users/lucyzhang/Documents/research/PC_net/results/trained_model/twolayer_test2/train_loader.pth')
+    '/Users/lucyzhang/Documents/research/PC_net/results/trained_model/threelayer_test2/train_loader.pth')
 test_loader = torch.load(
-    '/Users/lucyzhang/Documents/research/PC_net/results/trained_model/twolayer_test2/test_loader.pth')
+    '/Users/lucyzhang/Documents/research/PC_net/results/trained_model/threelayer_test2/test_loader.pth')
 
 # %%
 
@@ -434,14 +435,14 @@ inference_steps = 100
 epochs = 200
 
 #  network instantiation
-network_architecture = [dataWidth ** 2, 100]
-inf_rates = [.1, .05]
+network_architecture = [dataWidth ** 2, 1000, 100]
+inf_rates = [.4, .28, .2]  # double the value used during training to speed up convergence
 lr = .05
 per_im_repeat = 1
 
 trained_net = DHPC(network_architecture, inf_rates, lr)
 trained_net.load_state_dict(torch.load(
-    '/Users/lucyzhang/Documents/research/PC_net/results/trained_model/twolayer_test2/acc_train0.096acc_test0.1readout.pth',
+    '/Users/lucyzhang/Documents/research/PC_net/results/trained_model/threelayer_test2/acc_train0.102acc_test0.17readout.pth',
     map_location=device))
 trained_net.eval()
 
@@ -449,7 +450,7 @@ trained_net.eval()
 # %%
 # distribution of trained weights
 
-fig, axs = plt.subplots(2, len(network_architecture) - 1, figsize=(12, 4))
+fig, axs = plt.subplots(1, len(network_architecture) - 1, figsize=(12, 4))
 for i in range(len(network_architecture) - 1):
     axs[i].hist(trained_net.layers[i].weights)
 
@@ -468,7 +469,7 @@ classifier.to(device)
 train_x = []  # contains last layer representations learned from training data
 train_y = []  # contains labels in training data
 for i, (_image, _label) in enumerate(train_loader):
-    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 100))
+    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 700))
     train_y.append(_label)
 train_x, train_y = torch.stack(train_x), torch.cat(train_y)
 dataset = data.TensorDataset(train_x, train_y)
@@ -478,7 +479,7 @@ train_loader_rep = DataLoader(dataset, shuffle=True)
 train_x = []  # contains last layer representations learned from training data
 train_y = []  # contains labels in training data
 for i, (_image, _label) in enumerate(test_loader):
-    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 100))
+    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 700))
     train_y.append(_label)
 train_x, train_y = torch.stack(train_x), torch.cat(train_y)
 dataset = data.TensorDataset(train_x, train_y)
@@ -487,7 +488,7 @@ test_loader_rep = DataLoader(dataset, shuffle=True)
 # %%
 # train and test classifier
 
-epochs = 100
+epochs = 300
 iter = 0
 for epoch in range(int(epochs)):
     for i, (images, labels) in enumerate(train_loader_rep):

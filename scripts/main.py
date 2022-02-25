@@ -22,11 +22,12 @@ from evaluation import *
 if __name__ == '__main__':
     # seed the CPUs and GPUs
     torch.manual_seed(0)
-    cuda.manual_seed_all(0)
 
     if torch.cuda.is_available():  # Use GPU if possible
         dev = "cuda:0"
         print("Cuda is available")
+        cuda.manual_seed_all(0)
+
     else:
         dev = "cpu"
         print("Cuda not available")
@@ -36,7 +37,7 @@ if __name__ == '__main__':
 
     #  data preprocessing
     full_mnist = torchvision.datasets.MNIST(
-        root="/Users/lucyzhang/Documents/research/PC_net/data",
+        root="data",
         train=True,
         download=True,
         transform=torchvision.transforms.ToTensor()
@@ -60,8 +61,8 @@ if __name__ == '__main__':
     train_loader = DataLoader(train_dataset, shuffle=True)
     test_loader = DataLoader(test_dataset, shuffle=True)
 
-    torch.save(train_loader, '/Users/lucyzhang/Documents/research/PC_net/data/train_loader.pth')
-    torch.save(test_loader, '/Users/lucyzhang/Documents/research/PC_net/data/test_loader.pth')
+    torch.save(train_loader, 'data/train_loader.pth')
+    torch.save(test_loader, 'data/test_loader.pth')
 
     # %%
     ###########################
@@ -182,7 +183,7 @@ if __name__ == '__main__':
         #     })
 
         if epoch == epochs - 1:
-            torch.save(net.state_dict(), str(net.architecture) + str(net.inf_rates) + 'readout.pth')
+            torch.save(net.state_dict(), 'results/' + str(net.architecture) + str(net.inf_rates) + 'readout.pth')
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 4))
     axs[0].plot(total_errors)

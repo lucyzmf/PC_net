@@ -1,12 +1,16 @@
 # %%
+import numpy as np
+import torch.distributions
 import wandb
 
 wandb.login(key='25f10546ef384a6f1ab9446b42d7513024dea001')
 
 # %%
-"""
-pytorch implementation of deep hebbian predictive coding(DHPC) net that enables relatively flexible maniputation of network architecture
-code inspired by Matthias's code of PCtorch
+"""pytorch implementation of deep hebbian predictive coding(DHPC) net that enables relatively flexible maniputation 
+of network architecture code inspired by Matthias's code of PCtorch 
+
+this version implements new learning paradigm. an array stores representations formed from the output of highest layer 
+after seeing sample from that category 
 """
 import torchvision
 from torch.utils.data import Subset, DataLoader
@@ -24,24 +28,6 @@ device = torch.device(dev)
 
 dtype = torch.float  # Set standard datatype
 
-
-# %%
-###########################
-# helper functions
-###########################
-
-#  pytorch logistic regression
-class LogisticRegression(torch.nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(LogisticRegression, self).__init__()
-        self.linear = torch.nn.Linear(input_dim, output_dim)
-
-    def forward(self, x):
-        outputs = self.linear(x)
-        return outputs
-
-
-# %%
 #  data preprocessing
 
 full_mnist = torchvision.datasets.MNIST(
@@ -82,7 +68,7 @@ torch.save(test_loader, '/Users/lucyzhang/Documents/research/PC_net/data/test_lo
 wandb.init(project="DHPC", entity="lucyzmf")
 
 config = wandb.config
-config.infstep = 1
+config.infstep = 100
 config.epoch = 11
 config.infrate = [.1, .07, .05]
 config.lr = .05
@@ -100,11 +86,8 @@ net = DHPC(network_architecture, inf_rates, lr=config.lr, act_func=sigmoid, devi
 net.to(device)
 wandb.watch(net)
 
-#  initialising classifier
-classifier = LogisticRegression(network_architecture[-1], 10)
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(classifier.parameters(), lr=.01)
-classifier.to(device)
+# building memory storage
+mem = torch.rand([numClass, network_architecture[-1]]).to(device)
 
 # %%
 # values logged during training
@@ -126,9 +109,12 @@ for epoch in range(epochs):
 
     for i, (image, label) in enumerate(train_loader):
         net.init_states()
+        cat_mem = mem[label.item()]  # retrieve category rep
         for j in range(per_im_repeat):
-            net(torch.flatten(image), inference_steps)
+            cat_mem = net(torch.flatten(image), inference_steps, cat_mem)  # returns output of highest layer
         net.learn()
+        mem[label.item()] = cat_mem  # update cat mem with new highest layer output
+        # print(cat_mem, mem[label.item()])
         errors.append(net.total_error())
         last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
         wandb.log({
@@ -137,6 +123,10 @@ for epoch in range(epochs):
             'layer n-1 weights': wandb.Histogram(net.layers[-2].weights.detach().cpu()),
             'layer n-1 output distribution': wandb.Histogram(net.states['r_output'][-2].detach().cpu())
         })
+
+        # log mem storage as wandb table
+        my_table = wandb.Table(columns=np.arange(net.architecture[-1]).tolist(), data=mem.detach().numpy())
+        wandb.log({'catemory mem': my_table})
 
     total_errors.append(np.mean(errors))  # mean error per epoch
     last_layer_act_log.append(np.mean(last_layer_act))  # mean last layer activation per epoch
@@ -186,8 +176,9 @@ for epoch in range(epochs):
     #         'classifier train acc': train_acc,
     #         'classifier test acc': test_acc
     #     })
-    #
-    #     torch.save(net.state_dict(), 'train_acc' + str(train_acc) + 'test_acc' + str(train_acc) + 'readout.pth')
+
+    if epoch == epochs - 1:
+        torch.save(net.state_dict(), str(net.architecture) + str(net.inf_rates) + 'readout.pth')
 
 fig, axs = plt.subplots(1, 2, figsize=(10, 4))
 axs[0].plot(total_errors)

@@ -17,7 +17,7 @@ def sigmoid(inputs):
 
 class PredLayer(nn.Module):
     #  object class for standard layer in DHPC with error and representational units
-    def __init__(self, layer_size: int, out_size: int, inf_rate: float, device, dtype, lr_rate,  act_func
+    def __init__(self, layer_size: int, out_size: int, inf_rate: float, device, dtype, lr_rate, act_func
                  ) -> None:
         factory_kwargs = {'device': device, 'dtype': dtype}
         super(PredLayer, self).__init__()  # super().__init__()
@@ -89,6 +89,8 @@ class DHPC(nn.Module):
         e_act, r_act, r_out = [], [], []  # a list that always keep tracks of internal state values
         self.layers = nn.ModuleList()  # create module list containing all layers
         self.architecture = network_arch
+        self.device = device
+        self.dtype = dtype
 
         # e, r_act, r_out each an array, each index correspond to layer
         for layer in range(len(network_arch)):
@@ -106,7 +108,8 @@ class DHPC(nn.Module):
                 # add middle layer to module list and state list
                 e_act.append(torch.zeros(network_arch[layer]).to(device))  # tensor containing activation of error units
                 self.layers.append(
-                    PredLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer], device=device, dtype=dtype,
+                    PredLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer], device=device,
+                              dtype=dtype,
                               lr_rate=lr, act_func=act_func))
             else:
                 # add output layer to module list
@@ -124,8 +127,8 @@ class DHPC(nn.Module):
         # initialise values in state dict
         for i in range(len(self.states['r_activation'])):
             if i != len(self.architecture) - 1:
-                self.states['error'][i] = torch.zeros(self.architecture[i]).to(device)
-            self.states['r_activation'][i] = -2 * torch.ones(self.architecture[i]).to(device)
+                self.states['error'][i] = torch.zeros(self.architecture[i]).to(self.device)
+            self.states['r_activation'][i] = -2 * torch.ones(self.architecture[i]).to(self.device)
             self.states['r_output'][i] = self.layers[i].actFunc(self.states['r_activation'][i])
 
     def forward(self, frame, inference_steps):

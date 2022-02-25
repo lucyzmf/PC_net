@@ -16,6 +16,7 @@ import torchvision
 from torch.utils.data import Subset, DataLoader
 from sklearn.model_selection import train_test_split
 from network import DHPC, sigmoid
+import torch.cuda as cuda
 from evaluation import *
 
 if __name__ == '__main__':

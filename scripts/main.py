@@ -130,7 +130,7 @@ if __name__ == '__main__':
             })
 
             # log mem storage as wandb table
-            my_table = wandb.Table(columns=np.arange(net.architecture[-1]).tolist(), data=mem.detach().numpy())
+            my_table = wandb.Table(columns=np.arange(net.architecture[-1]).tolist(), data=mem.detach().cpu().numpy())
             wandb.log({'catemory mem': my_table})
 
         total_errors.append(np.mean(errors))  # mean error per epoch

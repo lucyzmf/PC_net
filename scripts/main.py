@@ -1,6 +1,6 @@
 # %%
 import numpy as np
-import torch.distributions
+import torch
 import wandb
 
 wandb.login(key='25f10546ef384a6f1ab9446b42d7513024dea001')

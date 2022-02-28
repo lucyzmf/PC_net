@@ -17,7 +17,7 @@ def sigmoid(inputs):
 
 # exponential decaying weighting variable update
 lamda = 1/30
-w0 = .05
+w0 = .1
 
 def decay(t):
     return w0*np.exp(-lamda * t)
@@ -80,7 +80,7 @@ class output_layer(PredLayer):
     # Additional class for last layer. This layer requires a different inference step as no top-down predictions exist.
     def forward(self, bu_errors, r_act, inf_step, cat_mem):
         w = decay(inf_step)
-        r_act = r_act + self.infRate * (1-w) * bu_errors + w * cat_mem  # receive input from both category mem and bottom up error
+        r_act = r_act + self.infRate * bu_errors + w * cat_mem  # receive input from both category mem and bottom up error
         r_out = self.actFunc(r_act)
         return r_act, r_out
 

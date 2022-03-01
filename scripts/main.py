@@ -85,7 +85,7 @@ if __name__ == '__main__':
         config.epoch = 1
         config.infrate = [.1, .07, .05]
         config.lr = .05
-        config.arch = [dataWidth ** 2, 1000, 50]
+        config.arch = [dataWidth ** 2, 2000, 100]
         config.batchSize = batchSize
         config.num_workers = n_workers
 

@@ -101,6 +101,7 @@ if __name__ == '__main__':
         net = DHPC(network_architecture, inf_rates, lr=config.lr, act_func=sigmoid, device=device, dtype=dtype)
         net.to(device)
         wandb.watch(net)
+        print('network instantiated')
 
         # building memory storage
         mem = torch.rand([numClass, network_architecture[-1]]).to(device)
@@ -118,6 +119,7 @@ if __name__ == '__main__':
             sample_image = test_images[0]  # Reshape them according to your needs.
             sample_label = test_labels[0]
 
+        print('start training')
         # prepare profiler
         profile_dir = "trace"
         with torch.profiler.profile(
@@ -158,6 +160,9 @@ if __name__ == '__main__':
                     # log mem storage as wandb table
                     my_table = wandb.Table(columns=np.arange(net.architecture[-1]).tolist(), data=mem.detach().cpu().numpy())
                     wandb.log({'catemory mem': my_table})
+
+                    # profiler step boundary
+                    p.step()
 
 
                 # summary data
@@ -210,11 +215,9 @@ if __name__ == '__main__':
                 #         'classifier test acc': test_acc
                 #     })
 
-                # profiler step boundary
-                p.step()
 
                 if epoch == epochs - 1:
-                    torch.save(net.state_dict(), 'results/' + str(net.architecture) + str(net.inf_rates) + 'readout.pth')
+                    torch.save(net.state_dict(),  str(net.architecture) + str(net.inf_rates) + 'readout.pth')
                 # profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
                 # # add the pt.trace.json files to the Artifact
                 # profile_art.add_file(glob.glob(profile_dir + "/*.pt.trace.json")[0], "trace.pt.trace.json")

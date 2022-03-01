@@ -214,7 +214,7 @@ if __name__ == '__main__':
                 p.step()
 
                 if epoch == epochs - 1:
-                    torch.save(net.state_dict(), '../results/' + str(net.architecture) + str(net.inf_rates) + 'readout.pth')
+                    torch.save(net.state_dict(), 'results/' + str(net.architecture) + str(net.inf_rates) + 'readout.pth')
                 profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
                 # add the pt.trace.json files to the Artifact
                 profile_art.add_file(glob.glob(profile_dir + "/*.pt.trace.json")[0], "trace.pt.trace.json")

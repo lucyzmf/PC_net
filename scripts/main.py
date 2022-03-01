@@ -215,11 +215,11 @@ if __name__ == '__main__':
 
                 if epoch == epochs - 1:
                     torch.save(net.state_dict(), 'results/' + str(net.architecture) + str(net.inf_rates) + 'readout.pth')
-                profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
-                # add the pt.trace.json files to the Artifact
-                profile_art.add_file(glob.glob(profile_dir + "/*.pt.trace.json")[0], "trace.pt.trace.json")
-                # log the artifact
-                wandb.log_artifact(profile_art)
+                # profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
+                # # add the pt.trace.json files to the Artifact
+                # profile_art.add_file(glob.glob(profile_dir + "/*.pt.trace.json")[0], "trace.pt.trace.json")
+                # # log the artifact
+                # wandb.log_artifact(profile_art)
 
 
         fig, axs = plt.subplots(1, 2, figsize=(10, 4))

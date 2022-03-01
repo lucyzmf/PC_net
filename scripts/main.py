@@ -1,11 +1,6 @@
 # %%
 import numpy as np
 import torch
-import wandb
-import os
-
-wandb.login(key='25f10546ef384a6f1ab9446b42d7513024dea001')
-os.environ["WANDB_MODE"] = "offline"
 
 # %%
 """pytorch implementation of deep hebbian predictive coding(DHPC) net that enables relatively flexible maniputation 
@@ -81,30 +76,20 @@ if __name__ == '__main__':
     ###########################
 
     with torch.no_grad():  # turn off auto grad function
-        wandb.init(project="DHPC", entity="lucyzmf")
 
-        config = wandb.config
-        config.infstep = 100
-        config.epoch = 1
-        config.infrate = [.1, .07, .05]
-        config.lr = .05
-        config.arch = [dataWidth ** 2, 1000, 50]
-        config.batchSize = batchSize
-        config.num_workers = n_workers
-        config.machine = machine
+        lr = .05
 
         # Hyperparameters for training
-        inference_steps = config.infstep
-        epochs = config.epoch
+        inference_steps = 100
+        epochs = 1
 
         #  network instantiation
-        network_architecture = config.arch
-        inf_rates = config.infrate
+        network_architecture = [dataWidth ** 2, 1000, 50]
+        inf_rates = [.1, .07, .05]
         per_im_repeat = 1
 
-        net = DHPC(network_architecture, inf_rates, lr=config.lr, act_func=sigmoid, device=device, dtype=dtype)
+        net = DHPC(network_architecture, inf_rates, lr=lr, act_func=sigmoid, device=device, dtype=dtype)
         net.to(device)
-        wandb.watch(net)
         print('network instantiated')
 
         # building memory storage
@@ -154,18 +139,6 @@ if __name__ == '__main__':
                     # print(cat_mem, mem[label.item()])
                     errors.append(net.total_error())
                     last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
-                    wandb.log({
-                        'last layer activation distribution': wandb.Histogram(
-                            net.states['r_activation'][-1].detach().cpu()),
-                        'last layer output distribution': wandb.Histogram(net.states['r_output'][-1].detach().cpu()),
-                        'layer n-1 weights': wandb.Histogram(net.layers[-2].weights.detach().cpu()),
-                        'layer n-1 output distribution': wandb.Histogram(net.states['r_output'][-2].detach().cpu())
-                    })
-
-                    # log mem storage as wandb table
-                    my_table = wandb.Table(columns=np.arange(net.architecture[-1]).tolist(),
-                                           data=mem.detach().cpu().numpy())
-                    wandb.log({'catemory mem': my_table})
 
                     # profiler step boundary
                     p.step()
@@ -174,36 +147,30 @@ if __name__ == '__main__':
                 total_errors.append(np.mean(errors))  # mean error per epoch
                 last_layer_act_log.append(np.mean(last_layer_act))  # mean last layer activation per epoch
 
-                wandb.log({
-                    'epoch': epoch,
-                    'train_error': total_errors[-1],
-                    'avg last layer act': last_layer_act_log[-1]
-                })
 
-                if (epoch % 10 == 0) and (epoch != 0):
-                    # test classification
-                    errors_test = []
-                    for i, (image, label) in enumerate(test_loader):
-                        net.init_states()
-                        net(torch.flatten(image), inference_steps)
-                        errors_test.append(net.total_error())
-                    total_errors_test.append(np.mean(errors_test))
-                    print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' % (
-                    epoch, total_errors[-1],
-                    last_layer_act_log[-1]), )
-                    print('total error on test set: %.4f' % (total_errors_test[-1]))
-                    reg_acc_train = test_accuracy(net, train_loader)
-                    reg_acc_test = test_accuracy(net, test_loader)
-
-                    wandb.log({
-                        'test_error': total_errors_test[-1],
-                        'reg acc on train set': reg_acc_train,
-                        'reg acc on test set': reg_acc_test
-                    })
+                # if (epoch % 10 == 0) and (epoch != 0):
+                #     # test classification
+                #     errors_test = []
+                #     for i, (image, label) in enumerate(test_loader):
+                #         net.init_states()
+                #         net(torch.flatten(image), inference_steps)
+                #         errors_test.append(net.total_error())
+                #     total_errors_test.append(np.mean(errors_test))
+                #     print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' % (
+                #     epoch, total_errors[-1],
+                #     last_layer_act_log[-1]), )
+                #     print('total error on test set: %.4f' % (total_errors_test[-1]))
+                #     reg_acc_train = test_accuracy(net, train_loader)
+                #     reg_acc_test = test_accuracy(net, test_loader)
+                #
+                #     wandb.log({
+                #         'test_error': total_errors_test[-1],
+                #         'reg acc on train set': reg_acc_train,
+                #         'reg acc on test set': reg_acc_test
+                #     })
 
                     # sample reconstruction
                     recon_error, fig = net.reconstruct(sample_image, sample_label, 10)
-                    wandb.log({'reconstructed image': wandb.Image(fig)})
 
                 # if (epoch == 0) or (epoch == epochs/2) or (epoch == epochs - 1):
                 #     # train classifier using training data
@@ -240,6 +207,6 @@ if __name__ == '__main__':
 
         # %%
         _, _, fig_train = generate_rdm(net, train_loader, 10, mem)
-        wandb.log({'rdm train data': wandb.Image(fig_train)})
+        # wandb.log({'rdm train data': wandb.Image(fig_train)})
         _, _, fig_test = generate_rdm(net, test_loader, 10, mem)
-        wandb.log({'rdm test data': wandb.Image(fig_test)})
+        # wandb.log({'rdm test data': wandb.Image(fig_test)})

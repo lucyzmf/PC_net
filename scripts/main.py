@@ -2,8 +2,10 @@
 import numpy as np
 import torch
 import wandb
+import os
 
 wandb.login(key='25f10546ef384a6f1ab9446b42d7513024dea001')
+os.environ["WANDB_MODE"] = "offline"
 
 # %%
 """pytorch implementation of deep hebbian predictive coding(DHPC) net that enables relatively flexible maniputation 
@@ -21,8 +23,6 @@ from evaluation import *
 import torch.profiler
 import glob
 
-
-
 if __name__ == '__main__':
     # seed the CPUs and GPUs
     torch.manual_seed(0)
@@ -33,12 +33,15 @@ if __name__ == '__main__':
         cuda.manual_seed_all(0)
         n_workers = 2
         batchSize = 1
+        machine = 'LISA cluster'
 
     else:
         dev = "cpu"
         print("Cuda not available")
         n_workers = 0
         batchSize = 1
+        machine = 'cpu'
+
     device = torch.device(dev)
 
     dtype = torch.float  # Set standard datatype
@@ -88,6 +91,7 @@ if __name__ == '__main__':
         config.arch = [dataWidth ** 2, 1000, 50]
         config.batchSize = batchSize
         config.num_workers = n_workers
+        config.machine = machine
 
         # Hyperparameters for training
         inference_steps = config.infstep
@@ -151,19 +155,20 @@ if __name__ == '__main__':
                     errors.append(net.total_error())
                     last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
                     wandb.log({
-                        'last layer activation distribution': wandb.Histogram(net.states['r_activation'][-1].detach().cpu()),
+                        'last layer activation distribution': wandb.Histogram(
+                            net.states['r_activation'][-1].detach().cpu()),
                         'last layer output distribution': wandb.Histogram(net.states['r_output'][-1].detach().cpu()),
                         'layer n-1 weights': wandb.Histogram(net.layers[-2].weights.detach().cpu()),
                         'layer n-1 output distribution': wandb.Histogram(net.states['r_output'][-2].detach().cpu())
                     })
 
                     # log mem storage as wandb table
-                    my_table = wandb.Table(columns=np.arange(net.architecture[-1]).tolist(), data=mem.detach().cpu().numpy())
+                    my_table = wandb.Table(columns=np.arange(net.architecture[-1]).tolist(),
+                                           data=mem.detach().cpu().numpy())
                     wandb.log({'catemory mem': my_table})
 
                     # profiler step boundary
                     p.step()
-
 
                 # summary data
                 total_errors.append(np.mean(errors))  # mean error per epoch
@@ -183,8 +188,9 @@ if __name__ == '__main__':
                         net(torch.flatten(image), inference_steps)
                         errors_test.append(net.total_error())
                     total_errors_test.append(np.mean(errors_test))
-                    print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
-                                                                                                          last_layer_act_log[-1]), )
+                    print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' % (
+                    epoch, total_errors[-1],
+                    last_layer_act_log[-1]), )
                     print('total error on test set: %.4f' % (total_errors_test[-1]))
                     reg_acc_train = test_accuracy(net, train_loader)
                     reg_acc_test = test_accuracy(net, test_loader)
@@ -215,16 +221,14 @@ if __name__ == '__main__':
                 #         'classifier test acc': test_acc
                 #     })
 
-
                 if epoch == epochs - 1:
                     print('end training, saving trained model')
-                    torch.save(net.state_dict(),  str(net.architecture) + str(net.inf_rates) + 'readout.pth')
+                    torch.save(net.state_dict(), str(net.architecture) + str(net.inf_rates) + 'readout.pth')
                 # profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
                 # # add the pt.trace.json files to the Artifact
                 # profile_art.add_file(glob.glob(profile_dir + "/*.pt.trace.json")[0], "trace.pt.trace.json")
                 # # log the artifact
                 # wandb.log_artifact(profile_art)
-
 
         fig, axs = plt.subplots(1, 2, figsize=(10, 4))
         axs[0].plot(total_errors)
@@ -239,4 +243,3 @@ if __name__ == '__main__':
         wandb.log({'rdm train data': wandb.Image(fig_train)})
         _, _, fig_test = generate_rdm(net, test_loader, 10, mem)
         wandb.log({'rdm test data': wandb.Image(fig_test)})
-

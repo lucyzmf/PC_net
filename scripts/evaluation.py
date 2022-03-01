@@ -57,13 +57,13 @@ def test_frame(model, test_data, inference_steps):
     plt.show()
 
 
-def generate_rdm(model, data_loader, inf_steps):  # generate rdm to inspect learned high level representation with either train or test data
+def generate_rdm(model, data_loader, inf_steps, mem):  # generate rdm to inspect learned high level representation with either train or test data
     # test sequence include all frames of tested sequences
     representation = []  # array containing representation from highest layer
     labels = []
 
     for i, (_image, _label) in enumerate(data_loader):
-        representation.append(high_level_rep(model, torch.flatten(_image), inf_steps))
+        representation.append(high_level_rep(model, torch.flatten(_image), inf_steps, mem[_label.item()]))
         labels.append(_label)
 
     sorted_label, indices = torch.sort(torch.tensor(labels))
@@ -82,9 +82,9 @@ def generate_rdm(model, data_loader, inf_steps):  # generate rdm to inspect lear
     return representation, labels, fig  # these have been sorted by class label
 
 
-def high_level_rep(model, image, inference_steps):
+def high_level_rep(model, image, inference_steps, cat_mem):
     model.init_states()
-    model.forward(torch.flatten(image), inference_steps)
+    model.forward(torch.flatten(image), inference_steps, cat_mem)
     return model.states['r_activation'][-1].detach()
 
 

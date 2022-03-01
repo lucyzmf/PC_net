@@ -170,7 +170,7 @@ if __name__ == '__main__':
                 #     })
 
                     # sample reconstruction
-                    recon_error, fig = net.reconstruct(sample_image, sample_label, 10)
+                    # recon_error, fig = net.reconstruct(sample_image, sample_label, 10)
 
                 # if (epoch == 0) or (epoch == epochs/2) or (epoch == epochs - 1):
                 #     # train classifier using training data

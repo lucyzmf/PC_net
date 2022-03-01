@@ -139,7 +139,7 @@ if __name__ == '__main__':
 
                 for i, (image, label) in enumerate(train_loader):
                     net.init_states()
-                    cat_mem = mem[label.item()]  # retrieve category rep
+                    cat_mem = mem[label]  # retrieve category rep
                     for j in range(per_im_repeat):
                         cat_mem = net(torch.flatten(image), inference_steps, cat_mem)  # returns output of highest layer
                     net.learn()

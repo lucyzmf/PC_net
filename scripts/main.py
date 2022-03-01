@@ -85,6 +85,7 @@ if __name__ == '__main__':
         config.epoch = 1
         config.infrate = [.1, .07, .05]
         config.lr = .05
+        config.arch = [dataWidth ** 2, 1000, 50]
         config.batchSize = batchSize
         config.num_workers = n_workers
 
@@ -93,7 +94,7 @@ if __name__ == '__main__':
         epochs = config.epoch
 
         #  network instantiation
-        network_architecture = [dataWidth ** 2, 1000, 50]
+        network_architecture = config.arch
         inf_rates = config.infrate
         per_im_repeat = 1
 

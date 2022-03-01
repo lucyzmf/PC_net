@@ -81,7 +81,7 @@ if __name__ == '__main__':
         wandb.init(project="DHPC", entity="lucyzmf")
 
         config = wandb.config
-        config.infstep = 1
+        config.infstep = 100
         config.epoch = 1
         config.infrate = [.1, .07, .05]
         config.lr = .05

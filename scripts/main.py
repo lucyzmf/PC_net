@@ -217,6 +217,7 @@ if __name__ == '__main__':
 
 
                 if epoch == epochs - 1:
+                    print('end training, saving trained model')
                     torch.save(net.state_dict(),  str(net.architecture) + str(net.inf_rates) + 'readout.pth')
                 # profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
                 # # add the pt.trace.json files to the Artifact
@@ -239,4 +240,3 @@ if __name__ == '__main__':
         _, _, fig_test = generate_rdm(net, test_loader, 10, mem)
         wandb.log({'rdm test data': wandb.Image(fig_test)})
 
-        # save profiling file as artifact and log on wandb

@@ -84,7 +84,7 @@ if __name__ == '__main__':
         epochs = 1
 
         #  network instantiation
-        network_architecture = [dataWidth ** 2, 1000, 50]
+        network_architecture = [dataWidth ** 2, 2000, 100]
         inf_rates = [.1, .07, .05]
         per_im_repeat = 1
 

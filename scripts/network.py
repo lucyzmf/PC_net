@@ -21,7 +21,7 @@ w0 = .1
 
 
 def decay(t):
-    return w0 * np.exp(-lamda * t)
+    return w0 * torch.exp(-lamda * t)
 
 
 class PredLayer(nn.Module):

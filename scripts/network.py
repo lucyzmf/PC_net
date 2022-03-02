@@ -16,12 +16,6 @@ def sigmoid(inputs):
 
 
 # exponential decaying weighting variable update
-lamda = 1 / 30
-w0 = .1
-
-
-def decay(t):
-    return w0 * torch.exp(-lamda * t)
 
 
 class PredLayer(nn.Module):
@@ -79,8 +73,8 @@ class input_layer(PredLayer):
 
 class output_layer(PredLayer):
     # Additional class for last layer. This layer requires a different inference step as no top-down predictions exist.
-    def forward(self, bu_errors, r_act, inf_step, cat_mem):
-        w = decay(inf_step)
+    def forward(self, bu_errors, r_act, inf_step, cat_mem, lamda, w0):
+        w = w0 * torch.exp(-lamda*inf_step)
         r_act = r_act + self.infRate * bu_errors + w * cat_mem  # receive input from both category mem and bottom up error
         r_out = self.actFunc(r_act)
         return r_act, r_out
@@ -94,7 +88,7 @@ class output_layer(PredLayer):
 # whenever forward pass is called, reads state dict first, then do computation
 
 class DHPC(nn.Module):
-    def __init__(self, network_arch, inf_rates, lr, act_func, device, dtype):
+    def __init__(self, network_arch, inf_rates, lr, act_func, device, dtype, lamda=1/30, w0=.1):
         super().__init__()
         e_act, r_act, r_out = [], [], []  # a list that always keep tracks of internal state values
         self.layers = nn.ModuleList().to(device)  # create module list containing all layers
@@ -102,6 +96,8 @@ class DHPC(nn.Module):
         self.inf_rates = inf_rates
         self.device = device
         self.dtype = dtype
+        self.lamda = torch.tensor(1/30) # rate of decay
+        self.w0 = torch.tensor(w0)  # starting clamp strength of cat mem
 
         # e, r_act, r_out each an array, each index correspond to layer
         for layer in range(len(network_arch)):
@@ -159,7 +155,7 @@ class DHPC(nn.Module):
                     r_act[j], r_out[j], r_out[j + 1])
             # update states of last layer
             r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
-                                              r_act[-1], inference_steps, cat_mem)
+                                              r_act[-1], inference_steps, cat_mem, self.lamda, self.w0)
 
         return r_out[-1]
 

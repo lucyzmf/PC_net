@@ -144,7 +144,7 @@ class DHPC(nn.Module):
         layers = self.layers
         r_act[0] = frame  # r units of first layer reflect input
         r_out[0] = layers[0].actFunc(r_act[0])
-        r_act[-1] = cat_mem * w0  # last layer activation equals to cat_mem output * weights (that equal to 1)
+        r_act[-1] = cat_mem * self.w0  # last layer activation equals to cat_mem output * weights (that equal to 1)
 
         # inference process
         for i in range(inference_steps):

@@ -184,7 +184,7 @@ if __name__ == '__main__':
                 if (epoch % 1 == 0) and (epoch != 0):
                     # test classification
                     errors_test = []
-                    cat_mem = torch.zeros(network_architecture[-1])
+                    cat_mem = torch.zeros(network_architecture[-1]).to(device)
                     for i, (image, label) in enumerate(test_loader):
                         net.init_states()
                         net(torch.flatten(image), inference_steps, cat_mem)

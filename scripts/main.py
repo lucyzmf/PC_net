@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     # genearte train test files for digit classification
     indices = np.arange(len(full_mnist))
-    train_indices, test_indices = train_test_split(indices, train_size=50 * 10, test_size=10 * 10,
+    train_indices, test_indices = train_test_split(indices, train_size=20 * 10, test_size=4 * 10,
                                                    stratify=full_mnist.targets)
 
     # Warp into Subsets and DataLoaders

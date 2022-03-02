@@ -82,8 +82,8 @@ with torch.no_grad():  # turn off auto grad function
     wandb.init(project="DHPC", entity="lucyzmf")
 
     config = wandb.config
-    config.infstep = 1
-    config.epoch = 11
+    config.infstep = 100
+    config.epoch = 1
     config.infrate = [.1, .07, .05]
     config.lr = .05
 

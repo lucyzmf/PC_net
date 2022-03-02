@@ -56,7 +56,7 @@ full_mnist = torchvision.datasets.MNIST(
 ### genearte train test files for digit classification
 
 indices = np.arange(len(full_mnist))
-train_indices, test_indices = train_test_split(indices, train_size=50 * 10, test_size=10 * 10,
+train_indices, test_indices = train_test_split(indices, train_size=10 * 10, test_size=3 * 10,
                                                stratify=full_mnist.targets)
 
 # Warp into Subsets and DataLoaders
@@ -83,7 +83,7 @@ with torch.no_grad():  # turn off auto grad function
 
     config = wandb.config
     config.infstep = 100
-    config.epoch = 1
+    config.epoch = 21
     config.infrate = [.1, .07, .05]
     config.lr = .05
 
@@ -158,13 +158,13 @@ with torch.no_grad():  # turn off auto grad function
             print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
                                                                                                   last_layer_act_log[-1]), )
             print('total error on test set: %.4f' % (total_errors_test[-1]))
-            reg_acc_train = test_accuracy(net, train_loader)
-            reg_acc_test = test_accuracy(net, test_loader)
+            # reg_acc_train = test_accuracy(net, train_loader)
+            # reg_acc_test = test_accuracy(net, test_loader)
 
             wandb.log({
                 'test_error': total_errors_test[-1],
-                'reg acc on train set': reg_acc_train,
-                'reg acc on test set': reg_acc_test
+                # 'reg acc on train set': reg_acc_train,
+                # 'reg acc on test set': reg_acc_test
             })
 
             # sample reconstruction

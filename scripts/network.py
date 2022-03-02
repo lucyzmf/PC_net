@@ -16,11 +16,12 @@ def sigmoid(inputs):
 
 
 # exponential decaying weighting variable update
-lamda = 1/30
+lamda = 1 / 30
 w0 = .1
 
+
 def decay(t):
-    return w0*np.exp(-lamda * t)
+    return w0 * np.exp(-lamda * t)
 
 
 class PredLayer(nn.Module):
@@ -96,7 +97,7 @@ class DHPC(nn.Module):
     def __init__(self, network_arch, inf_rates, lr, act_func, device, dtype):
         super().__init__()
         e_act, r_act, r_out = [], [], []  # a list that always keep tracks of internal state values
-        self.layers = nn.ModuleList()  # create module list containing all layers
+        self.layers = nn.ModuleList().to(device)  # create module list containing all layers
         self.architecture = network_arch
         self.inf_rates = inf_rates
         self.device = device

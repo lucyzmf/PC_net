@@ -82,7 +82,7 @@ if __name__ == '__main__':
 
         config = wandb.config
         config.infstep = 100
-        config.epoch = 11
+        config.epoch = 21
         config.infrate = [.1, .07, .05]
         config.lr = .05
         config.arch = [dataWidth ** 2, 1000, 50]
@@ -157,9 +157,7 @@ if __name__ == '__main__':
                         'layer n-1 output distribution': wandb.Histogram(net.states['r_output'][-2].detach().cpu())
                     })
 
-                    # # log mem storage as wandb table
-                    # my_table = wandb.Table(columns=np.arange(net.architecture[-1]).tolist(), data=mem.detach().cpu().numpy())
-                    # wandb.log({'catemory mem': my_table})
+
 
                     # profiler step boundary
                     p.step()
@@ -175,28 +173,37 @@ if __name__ == '__main__':
                     'avg last layer act': last_layer_act_log[-1]
                 })
 
-                if (epoch % 10 == 0) and (epoch != 0):
+                if epoch == epochs - 1:
+                    print('end training, saving trained model')
+                    torch.save(net.state_dict(),  str(net.architecture) + str(net.inf_rates) + 'readout.pth')
+
+                    # log mem storage as wandb table
+                    my_table = wandb.Table(columns=np.arange(net.architecture[-1]).tolist(), data=mem.detach().cpu().numpy())
+                    wandb.log({'catemory mem': my_table})
+
+                if (epoch % 1 == 0) and (epoch != 0):
                     # test classification
                     errors_test = []
+                    cat_mem = torch.zeros(network_architecture[-1])
                     for i, (image, label) in enumerate(test_loader):
                         net.init_states()
-                        net(torch.flatten(image), inference_steps)
+                        net(torch.flatten(image), inference_steps, cat_mem)
                         errors_test.append(net.total_error())
                     total_errors_test.append(np.mean(errors_test))
                     print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' % (epoch, total_errors[-1],
                                                                                                           last_layer_act_log[-1]), )
                     print('total error on test set: %.4f' % (total_errors_test[-1]))
-                    reg_acc_train = test_accuracy(net, train_loader)
-                    reg_acc_test = test_accuracy(net, test_loader)
+                    # reg_acc_train = test_accuracy(net, train_loader)
+                    # reg_acc_test = test_accuracy(net, test_loader)
 
                     wandb.log({
                         'test_error': total_errors_test[-1],
-                        'reg acc on train set': reg_acc_train,
-                        'reg acc on test set': reg_acc_test
+                        # 'reg acc on train set': reg_acc_train,
+                        # 'reg acc on test set': reg_acc_test
                     })
 
                     # sample reconstruction
-                    recon_error, fig = net.reconstruct(sample_image, sample_label, 10)
+                    recon_error, fig = net.reconstruct(sample_image, sample_label, 10, cat_mem)  # don't have any cat mem influence during testing
                     wandb.log({'reconstructed image': wandb.Image(fig)})
 
                 # if (epoch == 0) or (epoch == epochs/2) or (epoch == epochs - 1):
@@ -215,15 +222,6 @@ if __name__ == '__main__':
                 #         'classifier test acc': test_acc
                 #     })
 
-
-                if epoch == epochs - 1:
-                    print('end training, saving trained model')
-                    torch.save(net.state_dict(),  str(net.architecture) + str(net.inf_rates) + 'readout.pth')
-                # profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
-                # # add the pt.trace.json files to the Artifact
-                # profile_art.add_file(glob.glob(profile_dir + "/*.pt.trace.json")[0], "trace.pt.trace.json")
-                # # log the artifact
-                # wandb.log_artifact(profile_art)
 
 
         fig, axs = plt.subplots(1, 2, figsize=(10, 4))

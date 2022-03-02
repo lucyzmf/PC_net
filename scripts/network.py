@@ -171,9 +171,9 @@ class DHPC(nn.Module):
             total.append(error)
         return torch.mean(torch.tensor(total))
 
-    def reconstruct(self, image, label, infsteps):  # reconstruct from second layer output
+    def reconstruct(self, image, label, infsteps, cat_mem):  # reconstruct from second layer output
         self.init_states()
-        self.forward(torch.flatten(image), infsteps)
+        self.forward(torch.flatten(image), infsteps, cat_mem)
         label = label.item()
         error = self.total_error()
 

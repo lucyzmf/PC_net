@@ -45,7 +45,7 @@ class LogisticRegression(torch.nn.Module):
 #  data preprocessing
 
 full_mnist = torchvision.datasets.MNIST(
-    root="/Users/lucyzhang/Documents/research/PC_net/data",
+    root="data",
     train=True,
     download=True,
     transform=torchvision.transforms.ToTensor()
@@ -70,8 +70,8 @@ numClass = 10  # number of classes in mnist
 train_loader = DataLoader(train_dataset, shuffle=True)
 test_loader = DataLoader(test_dataset, shuffle=True)
 
-torch.save(train_loader, '/Users/lucyzhang/Documents/research/PC_net/data/train_loader.pth')
-torch.save(test_loader, '/Users/lucyzhang/Documents/research/PC_net/data/test_loader.pth')
+torch.save(train_loader, 'data/train_loader.pth')
+torch.save(test_loader, 'data/test_loader.pth')
 
 # %%
 ###########################

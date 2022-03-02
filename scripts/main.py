@@ -78,7 +78,7 @@ if __name__ == '__main__':
     ###########################
 
     with torch.no_grad():  # turn off auto grad function
-        wandb.init(project="DHPC", entity="lucyzmf")
+        wandb.init(project="DHPC", entity="lucyzmf", mode='disabled')
 
         config = wandb.config
         config.infstep = 100

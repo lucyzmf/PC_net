@@ -19,6 +19,10 @@ from torch.utils.data import Subset, DataLoader
 from sklearn.model_selection import train_test_split
 from network import DHPC, sigmoid
 from evaluation import *
+import os
+
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/nomem_10sample_lyricwood89')
+
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
@@ -44,10 +48,8 @@ class LogisticRegression(torch.nn.Module):
 
 # %%
 #  load the training set used during training
-train_loader = torch.load(
-    '/Users/lucyzhang/Documents/research/PC_net/results/nomem_10sample_lyricwood89/train_loader.pth')
-test_loader = torch.load(
-    '/Users/lucyzhang/Documents/research/PC_net/results/nomem_10sample_lyricwood89/test_loader.pth')
+train_loader = torch.load(os.path.join(file_path, 'train_loader.pth'))
+test_loader = torch.load(os.path.join(file_path, 'test_loader.pth'))
 
 # %%
 
@@ -102,13 +104,13 @@ dataset = data.TensorDataset(train_x, train_y)
 train_loader_rep = DataLoader(dataset, shuffle=True)
 
 
-train_x = []  # contains last layer representations learned from training data
-train_y = []  # contains labels in training data
+test_x = []  # contains last layer representations learned from testing data
+test_y = []  # contains labels in training data
 for i, (_image, _label) in enumerate(test_loader):
-    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 700))
-    train_y.append(_label)
-train_x, train_y = torch.stack(train_x), torch.cat(train_y)
-dataset = data.TensorDataset(train_x, train_y)
+    test_x.append(high_level_rep(trained_net, torch.flatten(_image), 700))
+    test_y.append(_label)
+test_x, test_y = torch.stack(test_x), torch.cat(test_y)
+dataset = data.TensorDataset(test_x, test_y)
 test_loader_rep = DataLoader(dataset, shuffle=True)
 
 # %%
@@ -141,3 +143,10 @@ for epoch in range(int(epochs)):
                 correct+= (predicted == labels).sum()
             accuracy = 100 * correct/total
             print("Iteration: {}. Loss: {}. Accuracy: {}.".format(iter, loss.item(), accuracy))
+
+# %%
+
+rdm_train = rdm_w_rep(train_x, 'cosine', True)
+rdm_train.savefig(os.path.join(file_path, 'rdm_train.png'))
+rdm_test = rdm_w_rep(test_x, 'cosine', False)
+rdm_test.savefig(os.path.join(file_path, 'rdm_test.png'))

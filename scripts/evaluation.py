@@ -127,3 +127,20 @@ def test_accuracy(model, data_loader):
 
     return cumulative_accuracy
 
+
+# %%
+# generate rdm with representations
+
+def rdm_w_rep(representations, metric_type, istrain):
+    pair_dist_cosine = pairwise_distances(representations, metric=metric_type)
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(pair_dist_cosine)
+    fig.colorbar(im, ax=ax)
+    if istrain:
+        ax.set_title('RDM cosine train data')
+    else:
+        ax.set_title('RDM cosine test data')
+    plt.show()
+
+    return fig

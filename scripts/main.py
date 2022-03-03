@@ -130,13 +130,15 @@ with torch.no_grad():  # turn off auto grad function
                 net(torch.flatten(image), inference_steps)
             net.learn()
             errors.append(net.total_error())
-            last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
-            wandb.log({
-                'last layer activation distribution': wandb.Histogram(net.states['r_activation'][-1].detach().cpu()),
-                'last layer output distribution': wandb.Histogram(net.states['r_output'][-1].detach().cpu()),
-                'layer n-1 weights': wandb.Histogram(net.layers[-2].weights.detach().cpu()),
-                'layer n-1 output distribution': wandb.Histogram(net.states['r_output'][-2].detach().cpu())
-            })
+
+            if i % 50 == 0:  # log every 50 steps
+                last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
+                wandb.log({
+                    'last layer activation distribution': wandb.Histogram(net.states['r_activation'][-1].detach().cpu()),
+                    'last layer output distribution': wandb.Histogram(net.states['r_output'][-1].detach().cpu()),
+                    'layer n-1 weights': wandb.Histogram(net.layers[-2].weights.detach().cpu()),
+                    'layer n-1 output distribution': wandb.Histogram(net.states['r_output'][-2].detach().cpu())
+                })
 
         total_errors.append(np.mean(errors))  # mean error per epoch
         last_layer_act_log.append(np.mean(last_layer_act))  # mean last layer activation per epoch
@@ -168,7 +170,7 @@ with torch.no_grad():  # turn off auto grad function
             })
 
             # sample reconstruction
-            recon_error, fig = net.reconstruct(sample_image, sample_label, 10)
+            recon_error, fig = net.reconstruct(sample_image, sample_label, 100)
             wandb.log({'reconstructed image': wandb.Image(fig)})
 
         # if (epoch == 0) or (epoch == epochs/2) or (epoch == epochs - 1):
@@ -187,7 +189,9 @@ with torch.no_grad():  # turn off auto grad function
         #         'classifier test acc': test_acc
         #     })
         #
-        #     torch.save(net.state_dict(), 'train_acc' + str(train_acc) + 'test_acc' + str(train_acc) + 'readout.pth')
+
+        if epoch == epochs-1:
+            torch.save(net.state_dict(), 'no_mem' + str(network_architecture) + str(inf_rates) + 'readout.pth')
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 4))
     axs[0].plot(total_errors)
@@ -198,7 +202,7 @@ with torch.no_grad():  # turn off auto grad function
     plt.show()
 
     # %%
-    _, _, fig_train = generate_rdm(net, train_loader, 10)
+    _, _, fig_train = generate_rdm(net, train_loader, 100)
     wandb.log({'rdm train data': wandb.Image(fig_train)})
-    _, _, fig_test = generate_rdm(net, test_loader, 10)
+    _, _, fig_test = generate_rdm(net, test_loader, 100)
     wandb.log({'rdm test data': wandb.Image(fig_test)})

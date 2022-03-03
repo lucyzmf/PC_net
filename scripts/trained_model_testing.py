@@ -1,8 +1,12 @@
 '''
 This script tests trained models
 '''
+import time
 
+import matplotlib.pyplot as plt
+import pandas
 import torchvision
+from sklearn.manifold import TSNE
 from torch.autograd import Variable
 from torch.utils import data
 from torch.utils.data import Subset, DataLoader
@@ -10,8 +14,10 @@ from sklearn.model_selection import train_test_split
 from network import DHPC, sigmoid
 import torch.cuda as cuda
 from evaluation import *
-import torch.profiler
-import glob
+import seaborn as sns
+import os
+
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/catmem_10sample_finewater88')
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
@@ -22,6 +28,7 @@ else:
 device = torch.device(dev)
 
 dtype = torch.float  # Set standard datatype
+
 
 #  pytorch logistic regression
 class LogisticRegression(torch.nn.Module):
@@ -34,13 +41,10 @@ class LogisticRegression(torch.nn.Module):
         return outputs
 
 
-
 # %%
 #  load the training set used during training
-train_loader = torch.load(
-    '/Users/lucyzhang/Documents/research/PC_net/results/catmem_10sample_finewater88/train_loader.pth')
-test_loader = torch.load(
-    '/Users/lucyzhang/Documents/research/PC_net/results/catmem_10sample_finewater88/test_loader.pth')
+train_loader = torch.load(os.path.join(file_path, 'train_loader.pth'))
+test_loader = torch.load(os.path.join(file_path, 'test_loader.pth'))
 
 # %%
 
@@ -49,9 +53,8 @@ numClass = 10  # number of classes in mnist
 
 # %%
 # load trained model
-# Hyperparameters for training
+# Hyperparameters used during training
 inference_steps = 100
-epochs = 200
 
 #  network instantiation
 network_architecture = [dataWidth ** 2, 1000, 50]
@@ -60,11 +63,10 @@ lr = .05
 per_im_repeat = 1
 
 trained_net = DHPC(network_architecture, inf_rates, lr=lr, act_func=sigmoid, device=device, dtype=dtype)
-trained_net.load_state_dict(torch.load(
-    '/Users/lucyzhang/Documents/research/PC_net/results/catmem_10sample_finewater88/[784, 1000, 50][0.1, 0.07, 0.05]readout.pth',
-    map_location=device))
+trained_net.load_state_dict(torch.load(os.path.join(file_path,
+                                                    '[784, 1000, 50][0.1, 0.07, 0.05]readout.pth'),
+                                       map_location=device))
 trained_net.eval()
-
 
 # %%
 # distribution of trained weights
@@ -72,8 +74,10 @@ trained_net.eval()
 fig, axs = plt.subplots(1, len(network_architecture) - 1, figsize=(12, 4))
 for i in range(len(network_architecture) - 1):
     axs[i].hist(trained_net.layers[i].weights)
+    axs[i].set_title('layer'+str(i))
 
 plt.show()
+fig.savefig(os.path.join(file_path, 'weight_dist'))
 
 # %%
 # code from online
@@ -85,22 +89,22 @@ classifier.to(device)
 # %%
 # generate representations using train and test images
 
+print('generate high level representations used for training and testing classifier')
 cat_mem = torch.zeros(network_architecture[-1]).to(device)
 
 train_x = []  # contains last layer representations learned from training data
 train_y = []  # contains labels in training data
 for i, (_image, _label) in enumerate(train_loader):
-    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 700, cat_mem))
+    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 1000, cat_mem))
     train_y.append(_label)
 train_x, train_y = torch.stack(train_x), torch.cat(train_y)
 dataset = data.TensorDataset(train_x, train_y)
 train_loader_rep = DataLoader(dataset, shuffle=True)
 
-
 test_x = []  # contains last layer representations learned from testing data
 test_y = []  # contains labels in training data
 for i, (_image, _label) in enumerate(test_loader):
-    test_x.append(high_level_rep(trained_net, torch.flatten(_image), 700, cat_mem))
+    test_x.append(high_level_rep(trained_net, torch.flatten(_image), 1000, cat_mem))
     test_y.append(_label)
 test_x, test_y = torch.stack(test_x), torch.cat(test_y)
 dataset = data.TensorDataset(test_x, test_y)
@@ -122,8 +126,8 @@ for epoch in range(int(epochs)):
         loss.backward()
         optimizer.step()
 
-        iter+=1
-        if iter%500==0:
+        iter += 1
+        if iter % 500 == 0:
             # calculate Accuracy
             correct = 0
             total = 0
@@ -131,13 +135,43 @@ for epoch in range(int(epochs)):
                 images = Variable(images.view(-1, network_architecture[-1]))
                 outputs = classifier(images)
                 _, predicted = torch.max(outputs.data, 1)
-                total+= labels.size(0)
+                total += labels.size(0)
                 # for gpu, bring the predicted and labels back to cpu fro python operations to work
-                correct+= (predicted == labels).sum()
-            accuracy = 100 * correct/total
+                correct += (predicted == labels).sum()
+            accuracy = 100 * correct / total
             print("Iteration: {}. Loss: {}. Accuracy: {}.".format(iter, loss.item(), accuracy))
 
 # %%
 
-rdm_w_rep(train_x, 'cosine')
-rdm_w_rep(test_x, 'cosine')
+rdm_train = rdm_w_rep(train_x, 'cosine', istrain=True)
+rdm_train.savefig(os.path.join(file_path, 'rdm_train.png'))
+rdm_test = rdm_w_rep(test_x, 'cosine', istrain=False)
+rdm_test.savefig(os.path.join(file_path, 'rdm_test.png'))
+
+# %%
+# tSNE clustering
+print('tSNE clustering')
+time_start = time.time()
+tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=1000)
+tsne_results = tsne.fit_transform(train_x)
+print('t-SNE done! Time elapsed: {} seconds'.format(time.time() - time_start))
+
+# %%
+# visualisation
+df = pandas.DataFrame()
+df['tsne-one'] = tsne_results[:, 0]
+df['tsne-two'] = tsne_results[:, 1]
+df['y'] = train_y
+fig, ax1 = plt.subplots(figsize=(10, 8))
+sns.scatterplot(
+    x="tsne-one", y="tsne-two",
+    hue="y",
+    palette=sns.color_palette("bright", 10),
+    data=df,
+    legend="full",
+    alpha=0.3,
+    ax=ax1
+)
+
+plt.show()
+fig.savefig(os.path.join(file_path, 'tSNE_clustering_rep'))

@@ -57,7 +57,8 @@ def test_frame(model, test_data, inference_steps):
     plt.show()
 
 
-def generate_rdm(model, data_loader, inf_steps, mem):  # generate rdm to inspect learned high level representation with either train or test data
+def generate_rdm(model, data_loader, inf_steps,
+                 mem):  # generate rdm to inspect learned high level representation with either train or test data
     # test sequence include all frames of tested sequences
     representation = []  # array containing representation from highest layer
     labels = []
@@ -77,7 +78,7 @@ def generate_rdm(model, data_loader, inf_steps, mem):  # generate rdm to inspect
     im = ax.imshow(pair_dist_cosine)
     fig.colorbar(im, ax=ax)
     ax.set_title('RDM cosine')
-#     plt.show()
+    #     plt.show()
 
     return representation, labels, fig  # these have been sorted by class label
 
@@ -94,7 +95,7 @@ def test_accuracy(model, data_loader):
     rep_list, labels, _ = generate_rdm(model, data_loader, 10)
     rep_list = rep_list.cpu()
     labels = np.array(labels)
-#     print(labels)
+    #     print(labels)
 
     # Select two samples of each class as test set, classify with knn (k = 5)
     skf = StratifiedKFold(n_splits=5, shuffle=True)  # split into 5 folds
@@ -127,3 +128,15 @@ def test_accuracy(model, data_loader):
 
     return cumulative_accuracy
 
+
+# %%
+# generate rdm with representations
+
+def rdm_w_rep(representations, type):
+    pair_dist_cosine = pairwise_distances(representations, metric=type)
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(pair_dist_cosine)
+    fig.colorbar(im, ax=ax)
+    ax.set_title('RDM cosine')
+    plt.show()

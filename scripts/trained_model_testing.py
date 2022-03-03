@@ -97,13 +97,13 @@ dataset = data.TensorDataset(train_x, train_y)
 train_loader_rep = DataLoader(dataset, shuffle=True)
 
 
-train_x = []  # contains last layer representations learned from training data
-train_y = []  # contains labels in training data
+test_x = []  # contains last layer representations learned from testing data
+test_y = []  # contains labels in training data
 for i, (_image, _label) in enumerate(test_loader):
-    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 700, cat_mem))
-    train_y.append(_label)
-train_x, train_y = torch.stack(train_x), torch.cat(train_y)
-dataset = data.TensorDataset(train_x, train_y)
+    test_x.append(high_level_rep(trained_net, torch.flatten(_image), 700, cat_mem))
+    test_y.append(_label)
+test_x, test_y = torch.stack(test_x), torch.cat(test_y)
+dataset = data.TensorDataset(test_x, test_y)
 test_loader_rep = DataLoader(dataset, shuffle=True)
 
 # %%
@@ -113,7 +113,7 @@ epochs = 300
 iter = 0
 for epoch in range(int(epochs)):
     for i, (images, labels) in enumerate(train_loader_rep):
-        images = Variable(images.view(-1, 50))
+        images = Variable(images.view(-1, network_architecture[-1]))
         labels = Variable(labels)
 
         optimizer.zero_grad()
@@ -128,7 +128,7 @@ for epoch in range(int(epochs)):
             correct = 0
             total = 0
             for images, labels in test_loader_rep:
-                images = Variable(images.view(-1, 50))
+                images = Variable(images.view(-1, network_architecture[-1]))
                 outputs = classifier(images)
                 _, predicted = torch.max(outputs.data, 1)
                 total+= labels.size(0)
@@ -136,3 +136,8 @@ for epoch in range(int(epochs)):
                 correct+= (predicted == labels).sum()
             accuracy = 100 * correct/total
             print("Iteration: {}. Loss: {}. Accuracy: {}.".format(iter, loss.item(), accuracy))
+
+# %%
+
+rdm_w_rep(train_x, 'cosine')
+rdm_w_rep(test_x, 'cosine')

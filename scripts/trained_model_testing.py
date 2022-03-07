@@ -17,7 +17,7 @@ from evaluation import *
 import seaborn as sns
 import os
 
-file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/catmem_10sample_finewater88')
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/pilot new learning paradigm/catmem_10sample_finewater88')
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
@@ -141,12 +141,6 @@ for epoch in range(int(epochs)):
             accuracy = 100 * correct / total
             print("Iteration: {}. Loss: {}. Accuracy: {}.".format(iter, loss.item(), accuracy))
 
-# %%
-
-rdm_train = rdm_w_rep(train_x, 'cosine', istrain=True)
-rdm_train.savefig(os.path.join(file_path, 'rdm_train.png'))
-rdm_test = rdm_w_rep(test_x, 'cosine', istrain=False)
-rdm_test.savefig(os.path.join(file_path, 'rdm_test.png'))
 
 # %%
 # tSNE clustering
@@ -175,3 +169,16 @@ sns.scatterplot(
 
 plt.show()
 fig.savefig(os.path.join(file_path, 'tSNE_clustering_rep'))
+
+# %%
+# sort representations by class first before passing to rdm function
+train_indices = np.argsort(train_y)
+train_x = train_x[train_indices]
+
+test_indices = np.argsort(test_y)
+test_x = test_x[test_indices]
+
+rdm_train = rdm_w_rep(train_x, 'cosine', istrain=True)
+rdm_train.savefig(os.path.join(file_path, 'rdm_train.png'))
+rdm_test = rdm_w_rep(test_x, 'cosine', istrain=False)
+rdm_test.savefig(os.path.join(file_path, 'rdm_test.png'))

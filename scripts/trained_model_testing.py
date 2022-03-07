@@ -26,7 +26,7 @@ from evaluation import *
 import seaborn as sns
 import os
 
-file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/nomem_10sample_lyricwood89')
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/pilot new learning paradigm/nomem_10sample_lyricwood89')
 
 
 if torch.cuda.is_available():  # Use GPU if possible

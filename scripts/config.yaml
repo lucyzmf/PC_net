@@ -1,0 +1,7 @@
+# data extraction
+dataset_dir: ../data/datasets
+train_size: 10
+test_size: 3
+pin_mem: True
+batch_size: 1
+num_workers: 2

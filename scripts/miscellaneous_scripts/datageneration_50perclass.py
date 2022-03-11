@@ -1,9 +1,6 @@
 # %%
 import numpy as np
-import matplotlib.pyplot as plt
-import torch
 import torchvision
-import torchvision.transforms.functional as F
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Subset, DataLoader
 

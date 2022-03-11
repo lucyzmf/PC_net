@@ -1,21 +1,18 @@
 '''
 This script tests trained models
 '''
+import os
 import time
 
-import matplotlib.pyplot as plt
 import pandas
-import torchvision
+import seaborn as sns
 from sklearn.manifold import TSNE
 from torch.autograd import Variable
 from torch.utils import data
-from torch.utils.data import Subset, DataLoader
-from sklearn.model_selection import train_test_split
-from network import DHPC, sigmoid
-import torch.cuda as cuda
+from torch.utils.data import DataLoader
+
 from evaluation import *
-import seaborn as sns
-import os
+from fc_net import DHPC, sigmoid
 
 file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/pilot new learning paradigm/catmem_10sample_finewater88')
 

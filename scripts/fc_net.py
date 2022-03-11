@@ -15,9 +15,6 @@ def sigmoid(inputs):
     return m(inputs)
 
 
-# exponential decaying weighting variable update
-
-
 class PredLayer(nn.Module):
     #  object class for standard layer in DHPC with error and representational units
     def __init__(self, layer_size: int, out_size: int, inf_rate: float, device, dtype, lr_rate, act_func
@@ -73,9 +70,8 @@ class input_layer(PredLayer):
 
 class output_layer(PredLayer):
     # Additional class for last layer. This layer requires a different inference step as no top-down predictions exist.
-    def forward(self, bu_errors, r_act, inf_step, cat_mem, lamda, w0):
-        w = w0 * torch.exp(-lamda*inf_step)
-        r_act = r_act + self.infRate * bu_errors + w * cat_mem  # receive input from both category mem and bottom up error
+    def forward(self, bu_errors, r_act):
+        r_act = r_act + self.infRate * bu_errors
         r_out = self.actFunc(r_act)
         return r_act, r_out
 
@@ -88,7 +84,7 @@ class output_layer(PredLayer):
 # whenever forward pass is called, reads state dict first, then do computation
 
 class DHPC(nn.Module):
-    def __init__(self, network_arch, inf_rates, lr, act_func, device, dtype, lamda=1/30, w0=.1):
+    def __init__(self, network_arch, inf_rates, lr, act_func, device, dtype):
         super().__init__()
         e_act, r_act, r_out = [], [], []  # a list that always keep tracks of internal state values
         self.layers = nn.ModuleList().to(device)  # create module list containing all layers
@@ -96,8 +92,6 @@ class DHPC(nn.Module):
         self.inf_rates = inf_rates
         self.device = device
         self.dtype = dtype
-        self.lamda = torch.tensor(1/30) # rate of decay
-        self.w0 = torch.tensor(w0)  # starting clamp strength of cat mem
 
         # e, r_act, r_out each an array, each index correspond to layer
         for layer in range(len(network_arch)):
@@ -138,13 +132,12 @@ class DHPC(nn.Module):
             self.states['r_activation'][i] = -2 * torch.ones(self.architecture[i]).to(self.device)
             self.states['r_output'][i] = self.layers[i].actFunc(self.states['r_activation'][i])
 
-    def forward(self, frame, inference_steps, cat_mem):
+    def forward(self, frame, inference_steps):
         # frame is input to the lowest layer, inference steps
         e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
         layers = self.layers
         r_act[0] = frame  # r units of first layer reflect input
         r_out[0] = layers[0].actFunc(r_act[0])
-        r_act[-1] = cat_mem * self.w0  # last layer activation equals to cat_mem output * weights (that equal to 1)
 
         # inference process
         for i in range(inference_steps):
@@ -155,9 +148,7 @@ class DHPC(nn.Module):
                     r_act[j], r_out[j], r_out[j + 1])
             # update states of last layer
             r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
-                                              r_act[-1], inference_steps, cat_mem, self.lamda, self.w0)
-
-        return r_out[-1]
+                                              r_act[-1])
 
     def learn(self):
         # iterate through all non last layers to update weights
@@ -171,9 +162,9 @@ class DHPC(nn.Module):
             total.append(error)
         return torch.mean(torch.tensor(total))
 
-    def reconstruct(self, image, label, infsteps, cat_mem):  # reconstruct from second layer output
+    def reconstruct(self, image, label, infsteps):  # reconstruct from second layer output
         self.init_states()
-        self.forward(torch.flatten(image), infsteps, cat_mem)
+        self.forward(torch.flatten(image), infsteps)
         label = label.item()
         error = self.total_error()
 

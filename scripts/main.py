@@ -135,7 +135,7 @@ if __name__ == '__main__':
                 for i, (image, label) in enumerate(train_loader):
                     net.init_states()
                     for j in range(per_seq_repeat):
-                        net(torch.flatten(image), inference_steps)
+                        net(image, inference_steps)
                     net.learn()
                     errors.append(net.total_error())
 

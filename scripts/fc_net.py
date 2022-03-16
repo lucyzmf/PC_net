@@ -135,7 +135,7 @@ class FcDHPC(nn.Module):
         # frame is input to the lowest layer, inference steps
         e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
         layers = self.layers
-        r_act[0] = frame  # r units of first layer reflect input
+        r_act[0] = torch.flatten(frame)  # r units of first layer reflect input
         r_out[0] = layers[0].actFunc(r_act[0])
 
         # inference process

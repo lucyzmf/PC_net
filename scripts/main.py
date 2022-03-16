@@ -113,6 +113,7 @@ if __name__ == '__main__':
         print('start training')
         # prepare profiler
         profile_dir = "../results/" + str(now) + '/trace/'
+        trained_model_dir = "../results/" + str(now) + '/trained_model/'
         with torch.profiler.profile(
                 activities=[
                     torch.profiler.ProfilerActivity.CPU,
@@ -164,8 +165,7 @@ if __name__ == '__main__':
 
                 if epoch == epochs - 1:
                     print('end training, saving trained model')
-                    torch.save(net.state_dict(), '../results/' + str(now) + '/trained_model/' + str(net.architecture) +
-                               str(net.inf_rates) + 'readout.pth')
+                    torch.save(net.state_dict(), trained_model_dir + str(net.architecture) + str(net.inf_rates) + 'readout.pth')
 
                 if (epoch % 10 == 0) and (epoch != 0):
                     # test classification

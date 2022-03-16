@@ -114,7 +114,6 @@ if __name__ == '__main__':
         # prepare profiler
         profile_dir = "../results/" + str(now) + '/trace/'
         trained_model_dir = "../results/" + str(now) + '/trained_model/'
-        os.mkdir(trained_model_dir)
         with torch.profiler.profile(
                 activities=[
                     torch.profiler.ProfilerActivity.CPU,
@@ -166,6 +165,7 @@ if __name__ == '__main__':
 
                 if epoch == epochs - 1:
                     print('end training, saving trained model')
+                    os.mkdir(trained_model_dir)
                     torch.save(net.state_dict(), trained_model_dir + str(net.architecture) + str(net.inf_rates) + 'readout.pth')
 
                 if (epoch % 10 == 0) and (epoch != 0):

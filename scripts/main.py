@@ -1,6 +1,4 @@
 # %%
-import os
-
 import wandb
 
 wandb.login(key='25f10546ef384a6f1ab9446b42d7513024dea001')
@@ -10,11 +8,17 @@ wandb.login(key='25f10546ef384a6f1ab9446b42d7513024dea001')
 pytorch implementation of PC net
 this branch tests the effects of architectural components on generalisation 
 """
-from fc_net import DHPC
+from fc_net import FcDHPC
 import torch.cuda as cuda
 from evaluation import *
-import torch.profiler
 import yaml
+import os
+import numpy as np
+import torch.profiler
+import datetime
+
+now = datetime.datetime.now()
+
 
 # load config
 CONFIG_PATH = "../scripts/"
@@ -53,16 +57,17 @@ if __name__ == '__main__':
     ### Training loop
     ###########################
     # meta data on MNIST dataset
-    numClass = 10
-    dataWidth = 28
+    numClass = len(train_loader.dataset.dataset.classes)
+    dataWidth = len(train_loader.dataset.dataset.data[0])
 
     with torch.no_grad():  # turn off auto grad function
-        inference_steps = config['infstep']  # num infsteps per image
+        inference_steps = config['infsteps']  # num infsteps per image
         epochs = config['epochs']  # total training epochs
         infrates = config['infrates']  # inf rates each layer
         lr = config['learning_rate']  # lr for weight updates
         arch = config['network_size']  # size of each layer
         per_seq_repeat = config['per_seq_repeat']  # num of repeats per image/sequence
+        arch_type = config['architecture']
 
         # Hyperparameters for training logged with wandb
         wandb.init(project="DHPC", entity="lucyzmf")  # , mode='disabled')
@@ -71,7 +76,8 @@ if __name__ == '__main__':
         wbconfig.infstep = inference_steps
         wbconfig.epochs = epochs
         wbconfig.infrate = infrates
-        wbconfig.architecture = arch
+        wbconfig.network_size = arch
+        wbconfig.architecture = arch_type
         wbconfig.lr = lr
         wbconfig.per_seq_repeat = per_seq_repeat
         wbconfig.batch_size = config['batch_size']
@@ -80,7 +86,10 @@ if __name__ == '__main__':
         wbconfig.act_func = config['act_func']
 
         #  network instantiation
-        net = DHPC(arch, infrates, lr=lr, act_func=config['act_func'], device=device, dtype=dtype)
+        if arch_type == 'FcDHPC':
+            net = FcDHPC(arch, infrates, lr=lr, act_func=config['act_func'], device=device, dtype=dtype)
+        else:
+            raise TypeError('network architecture not specified')
         net.to(device)
         wandb.watch(net)
         print('network instantiated')
@@ -103,7 +112,7 @@ if __name__ == '__main__':
 
         print('start training')
         # prepare profiler
-        profile_dir = "trace"
+        profile_dir = "../results/" + str(now) + '/trace/'
         with torch.profiler.profile(
                 activities=[
                     torch.profiler.ProfilerActivity.CPU,
@@ -155,16 +164,15 @@ if __name__ == '__main__':
 
                 if epoch == epochs - 1:
                     print('end training, saving trained model')
-                    torch.save(net.state_dict(), str(net.architecture) + str(net.inf_rates) + 'readout.pth')
-                    # TODO: change save trained network directory
+                    torch.save(net.state_dict(), '../results/' + str(now) + '/trained_model/' + str(net.architecture) +
+                               str(net.inf_rates) + 'readout.pth')
 
                 if (epoch % 10 == 0) and (epoch != 0):
                     # test classification
                     errors_test = []
                     for i, (image, label) in enumerate(test_loader):
                         net.init_states()
-                        net(torch.flatten(image), inference_steps)
-                        # TODO: move flatten to network script
+                        net(image, inference_steps)
                         errors_test.append(net.total_error())
                     total_errors_test.append(np.mean(errors_test))
                     print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' %
@@ -199,16 +207,16 @@ if __name__ == '__main__':
                 #         'classifier test acc': test_acc
                 #     })
 
-        fig, axs = plt.subplots(1, 2, figsize=(10, 4))
-        axs[0].plot(total_errors)
-        axs[0].set_title('Total Errors on training set')
-        axs[1].plot(total_errors_test)
-        axs[1].set_title('Total Errors on test set')
-        plt.tight_layout()
-        plt.show()
+        # fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+        # axs[0].plot(total_errors)
+        # axs[0].set_title('Total Errors on training set')
+        # axs[1].plot(total_errors_test)
+        # axs[1].set_title('Total Errors on test set')
+        # plt.tight_layout()
+        # plt.show()
 
         # %%
-        _, _, fig_train = generate_rdm(net, train_loader, 100)
+        _, _, fig_train = generate_rdm(net, train_loader, inference_steps*5)
         wandb.log({'rdm train data': wandb.Image(fig_train)})
-        _, _, fig_test = generate_rdm(net, test_loader, 100)
+        _, _, fig_test = generate_rdm(net, test_loader, inference_steps*5)
         wandb.log({'rdm test data': wandb.Image(fig_test)})

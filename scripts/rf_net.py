@@ -15,19 +15,21 @@ def sigmoid(inputs):
     return m(inputs)
 
 
-class FCLayer(nn.Module):
+class Rf_PredLayer(nn.Module):
     #  object class for standard layer in DHPC with error and representational units
-    def __init__(self, layer_size: int, out_size: int, inf_rate: float, device, dtype, lr_rate, act_func
+    def __init__(self, layer_width: int, filter_size: int, stride: int, inf_rate: float, device, dtype, lr_rate, act_func
                  ) -> None:
         factory_kwargs = {'device': device, 'dtype': dtype}
-        super(FCLayer, self).__init__()  # super().__init__()
-        self.layer_size = layer_size  # num of units in this layer
-        self.out_size = out_size  # num of units in next layer for constructution of weight matrix
+        super(Rf_PredLayer, self).__init__()  # super().__init__()
+        self.layer_width = layer_width  # num of units in this layer
+        self.out_width = layer_width - filter_size + stride  # num of units in next layer for constructution of weight matrix
+
         self.infRate = inf_rate  # inference rate governing how fast r adjust to errors
         self.actFunc = act_func  # activation function
         self.learn_rate = lr_rate  # learning rate
 
-        self.weights = torch.empty((layer_size, out_size), **factory_kwargs)
+        # TODO: add filters
+        self.weights = torch.empty((self.num_filters, layer_size, out_size), **factory_kwargs)
         self.reset_parameters()
         self.weights = nn.Parameter(self.weights, requires_grad=False)
         # self.reset_state()
@@ -53,6 +55,7 @@ class FCLayer(nn.Module):
                 bu_errors - e_act)  # Inference step: Modify activity depending on error
         r_out = self.actFunc(r_act)  # Apply the activation function to get neuronal output
         return e_act, r_act, r_out
+        # TODO: add flattened forward pass
 
     def w_update(self, e_act, nextlayer_output):
         # Learning step
@@ -60,14 +63,14 @@ class FCLayer(nn.Module):
         self.weights = nn.Parameter(torch.clamp(self.weights + delta, min=0))  # Keep only positive weights
 
 
-class input_layer(FCLayer):
+class input_layer(Rf_PredLayer):
     # Additional class for the input layer. This layer does not use a full inference step (driven only by input).
     def forward(self, inputs, nextlayer_r_out):
         e_act = inputs.to(self.device) - torch.matmul(self.weights, nextlayer_r_out)
         return e_act
 
 
-class output_layer(FCLayer):
+class output_layer(Rf_PredLayer):
     # Additional class for last layer. This layer requires a different inference step as no top-down predictions exist.
     def forward(self, bu_errors, r_act):
         r_act = r_act + self.infRate * bu_errors
@@ -82,7 +85,7 @@ class output_layer(FCLayer):
 # state dict that registers all the internal activations
 # whenever forward pass is called, reads state dict first, then do computation
 
-class FcDHPC(nn.Module):
+class RfDHPC(nn.Module):
     def __init__(self, network_arch, inf_rates, lr, act_func, device, dtype):
         super().__init__()
         e_act, r_act, r_out = [], [], []  # a list that always keep tracks of internal state values
@@ -108,9 +111,9 @@ class FcDHPC(nn.Module):
                 # add middle layer to module list and state list
                 e_act.append(torch.zeros(network_arch[layer]).to(device))  # tensor containing activation of error units
                 self.layers.append(
-                    FCLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer], device=device,
-                            dtype=dtype,
-                            lr_rate=lr, act_func=act_func))
+                    Rf_PredLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer], device=device,
+                              dtype=dtype,
+                              lr_rate=lr, act_func=act_func))
             else:
                 # add output layer to module list
                 e_act.append(None)

@@ -24,7 +24,7 @@ class FCLayer(nn.Module):
         self.layer_size = layer_size  # num of units in this layer
         self.out_size = out_size  # num of units in next layer for constructution of weight matrix
         self.infRate = inf_rate  # inference rate governing how fast r adjust to errors
-        self.actFunc = locals()[act_func]  # activation function
+        self.actFunc = globals()[act_func]  # activation function
         self.learn_rate = lr_rate  # learning rate
 
         self.weights = torch.empty((layer_size, out_size), **factory_kwargs)

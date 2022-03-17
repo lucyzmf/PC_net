@@ -2,6 +2,8 @@
 ###########################
 #  layer class
 ###########################
+import math
+
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
@@ -17,19 +19,29 @@ def sigmoid(inputs):
 
 class Rf_PredLayer(nn.Module):
     #  object class for standard layer in DHPC with error and representational units
-    def __init__(self, layer_width: int, filter_size: int, stride: int, inf_rate: float, device, dtype, lr_rate, act_func
+    def __init__(self, layer_size: int, out_size: int, filter_size: int, inf_rate: float, device, dtype,
+                 lr_rate, act_func
                  ) -> None:
         factory_kwargs = {'device': device, 'dtype': dtype}
         super(Rf_PredLayer, self).__init__()  # super().__init__()
-        self.layer_width = layer_width  # num of units in this layer
-        self.out_width = layer_width - filter_size + stride  # num of units in next layer for constructution of weight matrix
+        self.layer_size = layer_size  # num of units in this layer
+        self.layer_width = math.sqrt(layer_size)
+        self.filter_size = filter_size
+        self.out_size = out_size  # num of units in next layer for constructution of weight matrix
 
         self.infRate = inf_rate  # inference rate governing how fast r adjust to errors
-        self.actFunc = act_func  # activation function
+        self.actFunc = globals()[act_func]  # activation function
         self.learn_rate = lr_rate  # learning rate
 
-        # TODO: add filters
-        self.weights = torch.empty((self.num_filters, layer_size, out_size), **factory_kwargs)
+        self.weights = torch.empty((layer_size, out_size), **factory_kwargs)
+        self.connectivity_map = torch.empty((layer_size, out_size), **factory_kwargs)
+        for m in range(layer_size):  # create connectivity map, first calculate distance, then if > filtersize, 0
+            for n in range(out_size):
+                self.connectivity_map[m][n] = math.sqrt(
+                    (math.floor(m / self.layer_width) - math.floor(n / self.layer_width)) ** 2
+                    + (m % self.layer_width - n % self.layer_width) ** 2)
+        self.connectivity_map[self.connectivity_map <= filter_size] = 1
+        self.connectivity_map[self.connectivity_map > filter_size] = 0  # need to select in this sequence otherwise the matrix gets fked
         self.reset_parameters()
         self.weights = nn.Parameter(self.weights, requires_grad=False)
         # self.reset_state()
@@ -38,8 +50,9 @@ class Rf_PredLayer(nn.Module):
 
     def reset_parameters(self) -> None:  # initialise or reset layer weight
         nn.init.normal_(self.weights, 0, 0.5)  # normal distribution
-        self.weights = torch.clamp(self.weights, min=0)  # weights clamped to above 0
-        self.weights = self.weights / self.layer_size  # normalise weights given next layer size
+        # self.weights = torch.clamp(self.weights, min=0)  # weights clamped to above 0
+        self.weights = self.weights / self.filter_size ** 2  # normalise weights given next layer size
+        self.weights = self.weights * self.connectivity_map
 
     # def reset_state(self):
     # reinitialise activation and output values
@@ -55,12 +68,11 @@ class Rf_PredLayer(nn.Module):
                 bu_errors - e_act)  # Inference step: Modify activity depending on error
         r_out = self.actFunc(r_act)  # Apply the activation function to get neuronal output
         return e_act, r_act, r_out
-        # TODO: add flattened forward pass
 
     def w_update(self, e_act, nextlayer_output):
         # Learning step
         delta = self.learn_rate * torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1))
-        self.weights = nn.Parameter(torch.clamp(self.weights + delta, min=0))  # Keep only positive weights
+        self.weights = nn.Parameter((self.weights + delta) * self.connectivity_map) # get rid of extra rf connections
 
 
 class input_layer(Rf_PredLayer):
@@ -85,8 +97,8 @@ class output_layer(Rf_PredLayer):
 # state dict that registers all the internal activations
 # whenever forward pass is called, reads state dict first, then do computation
 
-class RfDHPC(nn.Module):
-    def __init__(self, network_arch, inf_rates, lr, act_func, device, dtype):
+class RfDHPC_cm(nn.Module):
+    def __init__(self, network_arch, filter_sizes, inf_rates, lr, act_func, device, dtype):
         super().__init__()
         e_act, r_act, r_out = [], [], []  # a list that always keep tracks of internal state values
         self.layers = nn.ModuleList().to(device)  # create module list containing all layers
@@ -105,19 +117,19 @@ class RfDHPC(nn.Module):
                 # add input layer to module list, add input layer state list
                 e_act.append(torch.zeros(network_arch[layer]).to(device))
                 self.layers.append(
-                    input_layer(network_arch[0], network_arch[1], inf_rates[0], device=device, dtype=dtype, lr_rate=lr,
+                    input_layer(network_arch[0], network_arch[1], filter_sizes[0], inf_rates[0], device=device, dtype=dtype, lr_rate=lr,
                                 act_func=act_func))  # append input layer to modulelist
             elif layer != len(network_arch) - 1:
                 # add middle layer to module list and state list
                 e_act.append(torch.zeros(network_arch[layer]).to(device))  # tensor containing activation of error units
                 self.layers.append(
-                    Rf_PredLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer], device=device,
-                              dtype=dtype,
-                              lr_rate=lr, act_func=act_func))
+                    Rf_PredLayer(network_arch[layer], network_arch[layer + 1], filter_sizes[layer], inf_rates[layer], device=device,
+                                 dtype=dtype,
+                                 lr_rate=lr, act_func=act_func))
             else:
                 # add output layer to module list
                 e_act.append(None)
-                self.layers.append(output_layer(network_arch[layer], network_arch[layer], inf_rates[layer],
+                self.layers.append(output_layer(network_arch[layer], network_arch[layer], filter_sizes[layer], inf_rates[layer],
                                                 device=device, dtype=dtype, lr_rate=lr, act_func=act_func))
 
         self.states = {
@@ -138,7 +150,7 @@ class RfDHPC(nn.Module):
         # frame is input to the lowest layer, inference steps
         e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
         layers = self.layers
-        r_act[0] = frame  # r units of first layer reflect input
+        r_act[0] = torch.flatten(frame)  # r units of first layer reflect input
         r_out[0] = layers[0].actFunc(r_act[0])
 
         # inference process

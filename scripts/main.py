@@ -9,6 +9,7 @@ pytorch implementation of PC net
 this branch tests the effects of architectural components on generalisation 
 """
 from fc_net import FcDHPC
+from rf_net_cm import RfDHPC_cm
 import torch.cuda as cuda
 from evaluation import *
 import yaml
@@ -88,6 +89,10 @@ if __name__ == '__main__':
         #  network instantiation
         if arch_type == 'FcDHPC':
             net = FcDHPC(arch, infrates, lr=lr, act_func=config['act_func'], device=device, dtype=dtype)
+        elif arch_type == 'RfDHPC_cm':
+            rf_sizes = config['rf_sizes']
+            wbconfig.rf_sizes = rf_sizes
+            net = RfDHPC_cm(arch, rf_sizes, infrates, lr=lr, act_func=config['act_func'], device=device, dtype=dtype)
         else:
             raise TypeError('network architecture not specified')
         net.to(device)

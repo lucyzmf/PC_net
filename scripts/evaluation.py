@@ -4,7 +4,7 @@
 ###########################
 import numpy as np
 import torch
-import torch.functional as F
+import torch.nn.functional as F
 from matplotlib import pyplot as plt
 from sklearn import linear_model
 from sklearn.metrics import pairwise_distances, accuracy_score
@@ -91,7 +91,7 @@ def high_level_rep(model, image, inference_steps):
 # %%
 # test function: takes the model, generates highest level representations, use KNN to classify
 def test_accuracy(model, data_loader):
-    rep_list, labels, _ = generate_rdm(model, data_loader, 10)
+    rep_list, labels, _ = generate_rdm(model, data_loader, 500)
     rep_list = rep_list.cpu()
     labels = np.array(labels)
     #     print(labels)

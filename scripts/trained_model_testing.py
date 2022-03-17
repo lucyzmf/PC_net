@@ -1,20 +1,35 @@
 '''
-This script tests trained models
+This script evalute trained models
 '''
+import glob
 import os
 import time
 
 import pandas
 import seaborn as sns
+import yaml
 from sklearn.manifold import TSNE
 from torch.autograd import Variable
 from torch.utils import data
 from torch.utils.data import DataLoader
 
 from evaluation import *
-from fc_net import DHPC, sigmoid
+from fc_net import FcDHPC
+from rf_net_cm import RfDHPC_cm
 
-file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/pilot new learning paradigm/catmem_10sample_finewater88')
+# load config
+CONFIG_PATH = "../scripts/"
+
+
+def load_config(config_name):
+    with open(os.path.join(CONFIG_PATH, config_name)) as file:
+        config = yaml.safe_load(file)
+    return config
+
+
+config = load_config("config.yaml")
+
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/2022-03-17 12:36:28.392699')
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
@@ -51,34 +66,43 @@ numClass = 10  # number of classes in mnist
 # %%
 # load trained model
 # Hyperparameters used during training
-inference_steps = 100
+inference_steps = config['infsteps']  # num infsteps per image
+epochs = config['epochs']  # total training epochs
+infrates = config['infrates']  # inf rates each layer
+lr = config['learning_rate']  # lr for weight updates
+arch = config['network_size']  # size of each layer
+per_seq_repeat = config['per_seq_repeat']  # num of repeats per image/sequence
+arch_type = config['architecture']
 
 #  network instantiation
-network_architecture = [dataWidth ** 2, 1000, 50]
-inf_rates = [.2, .14, .1]  # double the value used during training to speed up convergence
-lr = .05
 per_im_repeat = 1
 
-trained_net = DHPC(network_architecture, inf_rates, lr=lr, act_func=sigmoid, device=device, dtype=dtype)
-trained_net.load_state_dict(torch.load(os.path.join(file_path,
-                                                    '[784, 1000, 50][0.1, 0.07, 0.05]readout.pth'),
-                                       map_location=device))
+# trained_net = DHPC(network_architecture, inf_rates, lr=lr, act_func=sigmoid, device=device, dtype=dtype)
+if config['architecture'] == 'FcDHPC':
+    trained_net = FcDHPC(config['network_size'], config['infrates'] * 2, lr=config['learning_rate'],
+                         act_func=config['act_func'],
+                         device=device, dtype=dtype)
+elif config['architecture'] == 'RfDHPC_cm':
+    trained_net = RfDHPC_cm(config['network_size'], config['rf_sizes'], config['infrates'] * 2, lr=config['learning_rate'],
+                            act_func=config['act_func'],
+                            device=device, dtype=dtype)
+trained_net.load_state_dict(torch.load(glob.glob(file_path + '/*/*readout.pth')[0], map_location=torch.device('cpu')))
 trained_net.eval()
 
 # %%
 # distribution of trained weights
 
-fig, axs = plt.subplots(1, len(network_architecture) - 1, figsize=(12, 4))
-for i in range(len(network_architecture) - 1):
+fig, axs = plt.subplots(1, len(arch) - 1, figsize=(12, 4))
+for i in range(len(arch) - 1):
     axs[i].hist(trained_net.layers[i].weights)
-    axs[i].set_title('layer'+str(i))
+    axs[i].set_title('layer' + str(i))
 
 plt.show()
 fig.savefig(os.path.join(file_path, 'weight_dist'))
 
 # %%
 # code from online
-classifier = LogisticRegression(network_architecture[-1], 10)
+classifier = LogisticRegression(arch[-1], 10)
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(classifier.parameters(), lr=.001)
 classifier.to(device)
@@ -87,12 +111,12 @@ classifier.to(device)
 # generate representations using train and test images
 
 print('generate high level representations used for training and testing classifier')
-cat_mem = torch.zeros(network_architecture[-1]).to(device)
+cat_mem = torch.zeros(arch[-1]).to(device)
 
 train_x = []  # contains last layer representations learned from training data
 train_y = []  # contains labels in training data
 for i, (_image, _label) in enumerate(train_loader):
-    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 1000, cat_mem))
+    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 1000))
     train_y.append(_label)
 train_x, train_y = torch.stack(train_x), torch.cat(train_y)
 dataset = data.TensorDataset(train_x, train_y)
@@ -101,7 +125,7 @@ train_loader_rep = DataLoader(dataset, shuffle=True)
 test_x = []  # contains last layer representations learned from testing data
 test_y = []  # contains labels in training data
 for i, (_image, _label) in enumerate(test_loader):
-    test_x.append(high_level_rep(trained_net, torch.flatten(_image), 1000, cat_mem))
+    test_x.append(high_level_rep(trained_net, torch.flatten(_image), 1000))
     test_y.append(_label)
 test_x, test_y = torch.stack(test_x), torch.cat(test_y)
 dataset = data.TensorDataset(test_x, test_y)
@@ -114,7 +138,7 @@ epochs = 300
 iter = 0
 for epoch in range(int(epochs)):
     for i, (images, labels) in enumerate(train_loader_rep):
-        images = Variable(images.view(-1, network_architecture[-1]))
+        images = Variable(images.view(-1, arch[-1]))
         labels = Variable(labels)
 
         optimizer.zero_grad()
@@ -128,16 +152,15 @@ for epoch in range(int(epochs)):
             # calculate Accuracy
             correct = 0
             total = 0
-            for images, labels in test_loader_rep:
-                images = Variable(images.view(-1, network_architecture[-1]))
-                outputs = classifier(images)
+            for _images, _labels in enumerate(test_loader_rep):
+                _images = Variable(_images.view(-1, 784))
+                outputs = classifier(_images)
                 _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
+                total += _labels.size(0)
                 # for gpu, bring the predicted and labels back to cpu fro python operations to work
-                correct += (predicted == labels).sum()
+                correct += (predicted == _labels).sum()
             accuracy = 100 * correct / total
             print("Iteration: {}. Loss: {}. Accuracy: {}.".format(iter, loss.item(), accuracy))
-
 
 # %%
 # tSNE clustering
@@ -179,3 +202,7 @@ rdm_train = rdm_w_rep(train_x, 'cosine', istrain=True)
 rdm_train.savefig(os.path.join(file_path, 'rdm_train.png'))
 rdm_test = rdm_w_rep(test_x, 'cosine', istrain=False)
 rdm_test.savefig(os.path.join(file_path, 'rdm_test.png'))
+
+# %%
+acc = test_accuracy(trained_net, train_loader)
+print(acc)

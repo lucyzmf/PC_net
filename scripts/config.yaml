@@ -1,7 +1,7 @@
 # data extraction
 dataset_dir: ../data/datasets
-train_size: 10
-test_size: 3
+train_size: 50
+test_size: 10
 pin_mem: True
 batch_size: 1
 num_workers: 2
@@ -17,4 +17,4 @@ per_seq_repeat: 1
 
 # network architecture: FcDHPC,RfDHPC_cm
 architecture: RfDHPC_cm
-rf_sizes: [3, 3, 5]
+rf_sizes: [5, 5, 9]

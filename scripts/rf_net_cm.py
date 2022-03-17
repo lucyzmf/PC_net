@@ -66,6 +66,11 @@ class Rf_PredLayer(nn.Module):
                                      nextlayer_r_out)  # The activity of error neurons is representation - prediction.
         r_act = r_act + self.infRate * (
                 bu_errors - e_act)  # Inference step: Modify activity depending on error
+
+        # add competition: calculate mean, if smaller than mean, silence
+        mean = torch.mean(r_act)
+        r_act[r_act < mean] = 0
+
         r_out = self.actFunc(r_act)  # Apply the activation function to get neuronal output
         return e_act, r_act, r_out
 
@@ -87,6 +92,11 @@ class output_layer(Rf_PredLayer):
     def forward(self, bu_errors, r_act):
         r_act = r_act + self.infRate * bu_errors
         r_out = self.actFunc(r_act)
+
+        # add competition: calculate mean, if smaller than mean, silence
+        mean = torch.mean(r_act)
+        r_act[r_act < mean] = 0
+
         return r_act, r_out
 
 

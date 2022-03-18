@@ -70,7 +70,7 @@ class Rf_PredLayer(nn.Module):
         # add competition: calculate mean, if smaller than mean, silence
         mean = torch.mean(r_act)
         std = torch.std(r_act)
-        r_act[r_act < (mean+std)] = -2
+        r_act[r_act < (mean + 0.5 * std)] = -2
 
         r_out = self.actFunc(r_act)  # Apply the activation function to get neuronal output
         return e_act, r_act, r_out
@@ -97,7 +97,7 @@ class output_layer(Rf_PredLayer):
         # add competition: calculate mean, if smaller than mean, silence
         mean = torch.mean(r_act)
         std = torch.std(r_act)
-        r_act[r_act < (mean+std)] = -2
+        r_act[r_act < (mean + 0.5 * std)] = -2
 
         return r_act, r_out
 

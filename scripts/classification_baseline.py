@@ -129,7 +129,7 @@ for epoch in range(int(epochs)):
             correct = 0
             total = 0
             for i, (_images, _labels) in enumerate(test_loader):
-                _images = Variable(_images.view(-1, 784))
+                _images = Variable(_images.view(-1, 784)).to(device)
                 outputs = classifier(_images)
                 _, predicted = torch.max(outputs.data, 1)
                 total += _labels.size(0)

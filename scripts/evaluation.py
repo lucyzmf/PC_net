@@ -85,7 +85,7 @@ def generate_rdm(model, data_loader, inf_steps):  # generate rdm to inspect lear
 def high_level_rep(model, image, inference_steps):
     model.init_states()
     model.forward(torch.flatten(image), inference_steps)
-    return model.states['r_activation'][-1].detach()
+    return model.states['r_output'][-1].detach()
 
 
 # %%

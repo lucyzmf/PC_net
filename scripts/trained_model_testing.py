@@ -29,7 +29,7 @@ def load_config(config_name):
 
 config = load_config("config.yaml")
 
-file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/2022-03-17 12:36:28.392699')
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/2022-03-17 15:58:40.930652')
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
@@ -116,7 +116,7 @@ cat_mem = torch.zeros(arch[-1]).to(device)
 train_x = []  # contains last layer representations learned from training data
 train_y = []  # contains labels in training data
 for i, (_image, _label) in enumerate(train_loader):
-    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 1000))
+    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 500))
     train_y.append(_label)
 train_x, train_y = torch.stack(train_x), torch.cat(train_y)
 dataset = data.TensorDataset(train_x, train_y)
@@ -125,7 +125,7 @@ train_loader_rep = DataLoader(dataset, shuffle=True)
 test_x = []  # contains last layer representations learned from testing data
 test_y = []  # contains labels in training data
 for i, (_image, _label) in enumerate(test_loader):
-    test_x.append(high_level_rep(trained_net, torch.flatten(_image), 1000))
+    test_x.append(high_level_rep(trained_net, torch.flatten(_image), 500))
     test_y.append(_label)
 test_x, test_y = torch.stack(test_x), torch.cat(test_y)
 dataset = data.TensorDataset(test_x, test_y)
@@ -134,7 +134,7 @@ test_loader_rep = DataLoader(dataset, shuffle=True)
 # %%
 # train and test classifier
 
-epochs = 300
+epochs = 200
 iter = 0
 for epoch in range(int(epochs)):
     for i, (images, labels) in enumerate(train_loader_rep):
@@ -152,8 +152,8 @@ for epoch in range(int(epochs)):
             # calculate Accuracy
             correct = 0
             total = 0
-            for _images, _labels in enumerate(test_loader_rep):
-                _images = Variable(_images.view(-1, 784))
+            for i, (_images, _labels) in enumerate(test_loader_rep):
+                _images = Variable(_images.view(-1, arch[-1]))
                 outputs = classifier(_images)
                 _, predicted = torch.max(outputs.data, 1)
                 total += _labels.size(0)
@@ -204,5 +204,3 @@ rdm_test = rdm_w_rep(test_x, 'cosine', istrain=False)
 rdm_test.savefig(os.path.join(file_path, 'rdm_test.png'))
 
 # %%
-acc = test_accuracy(trained_net, train_loader)
-print(acc)

@@ -68,8 +68,9 @@ class Rf_PredLayer(nn.Module):
                 bu_errors - e_act)  # Inference step: Modify activity depending on error
 
         # add competition: calculate mean, if smaller than mean, silence
-        # mean = torch.mean(r_act)
-        r_act[r_act < 0] = -2
+        mean = torch.mean(r_act)
+        std = torch.std(r_act)
+        r_act[r_act < (mean+std)] = -2
 
         r_out = self.actFunc(r_act)  # Apply the activation function to get neuronal output
         return e_act, r_act, r_out
@@ -94,8 +95,9 @@ class output_layer(Rf_PredLayer):
         r_out = self.actFunc(r_act)
 
         # add competition: calculate mean, if smaller than mean, silence
-        # mean = torch.mean(r_act)
-        r_act[r_act < 0] = -2
+        mean = torch.mean(r_act)
+        std = torch.std(r_act)
+        r_act[r_act < (mean+std)] = -2
 
         return r_act, r_out
 

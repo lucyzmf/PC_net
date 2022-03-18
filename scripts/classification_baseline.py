@@ -2,7 +2,6 @@
 import datetime
 import os
 
-import numpy as np
 import torch.profiler
 import yaml
 from torch.autograd import Variable
@@ -115,8 +114,8 @@ epochs = 200
 iter = 0
 for epoch in range(int(epochs)):
     for i, (images, labels) in enumerate(train_loader):
-        images = Variable(images.view(-1, 784))
-        labels = Variable(labels)
+        images = Variable(images.view(-1, 784)).to(device)
+        labels = Variable(labels).to(device)
 
         optimizer.zero_grad()
         outputs = classifier(images)

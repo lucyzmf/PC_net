@@ -29,7 +29,7 @@ def load_config(config_name):
 
 config = load_config("config.yaml")
 
-file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/2022-03-17 15:58:40.930652')
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/2022-03-18 16:35:47.941832')
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"

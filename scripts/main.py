@@ -50,8 +50,8 @@ if __name__ == '__main__':
     dtype = torch.float  # Set standard datatype
 
     # load data
-    train_loader = torch.load(os.path.join(config['dataset_dir'], 'train_loader.pth'))
-    test_loader = torch.load(os.path.join(config['dataset_dir'], 'test_loader.pth'))
+    train_loader = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader.pth'))
+    test_loader = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_loader.pth'))
 
     # %%
     ###########################

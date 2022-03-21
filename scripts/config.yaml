@@ -1,0 +1,27 @@
+# data extraction
+dataset_dir: ../data/datasets
+# MNIST, fashionMNIST
+dataset_type: fashionMNIST
+train_size: 50
+test_size: 10
+pin_mem: True
+batch_size: 1
+num_workers: 2
+
+# network hyperparameters
+epochs: 20
+infsteps: 100
+infrates: [.1, .1, .1]
+network_size: [784, 784, 400]
+learning_rate: .05
+act_func: sigmoid
+per_seq_repeat: 1
+
+# network architecture: FcDHPC,RfDHPC_cm
+architecture: RfDHPC_cm
+rf_sizes: [5, 9, 15]
+
+# used to generate morphing dataset
+sample_per_class: 10
+frame_per_sequence: 6
+morphe_type:

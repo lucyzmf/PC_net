@@ -237,7 +237,7 @@ def shuffle(data):  # take tensor datasets and targets and returns shuffled data
 
 
 # %%
-# generate sequence
+# generate train sequence
 train_x, train_y, train_log = generate_spin_sequence(train_dataset, rotation_axis, direction)
 
 # shuffle sequence, targets, and log
@@ -246,7 +246,27 @@ train_y = shuffle(train_y)
 train_log['rotation_axis'] = shuffle(train_log['rotation_axis'])
 train_log['direction'] = shuffle(train_log['direction'])
 
+# %%
+# collapse first two dimensions of train_x, add dimension to train_y
+train_x = train_x.view(-1, data_width, data_width)
+train_y = torch.unsqueeze(train_y, dim=1)
+train_y = torch.flatten(train_y.repeat(1, frames_per_sequence))
 
+# %%
+# generate test sequence
+test_x, test_y, test_log = generate_spin_sequence(test_dataset, rotation_axis, direction)
+
+# shuffle sequence, targets, and log
+test_x = shuffle(test_x)
+test_y = shuffle(test_y)
+test_log['rotation_axis'] = shuffle(test_log['rotation_axis'])
+test_log['direction'] = shuffle(test_log['direction'])
+
+# %%
+# collapse first two dimensions of train_x, add dimension to train_y
+test_x = test_x.view(-1, data_width, data_width)
+test_y = torch.unsqueeze(test_y, dim=1)
+test_y = torch.flatten(test_y.repeat(1, frames_per_sequence))
 
 # TODO: save to dataset dir
 

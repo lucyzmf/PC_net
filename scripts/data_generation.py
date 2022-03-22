@@ -173,25 +173,30 @@ def transform(image,
     image = cv2.warpPerspective(image, M, (w, h))
     return image
 
-
+f = (2*28**2)**.5
 # %%
 # rotation around y
 rotated_angle = [-20, -10, 0, 10, 20]
 fig, axs = plt.subplots(len(rotated_angle), 1, sharey=True, figsize=(5, 20))
 for i in range(len(rotated_angle)):
-    rot_sample = transform(sample, translation=(rotated_angle[i]*.85, 0, 0), rotation=(0, rotated_angle[i], 0))
+    rot_sample = transform(sample, translation=(np.sin(np.deg2rad(rotated_angle[i]))*f, 0, (1-np.cos(np.deg2rad(rotated_angle[i])))*f), rotation=(0, rotated_angle[i], 0))
     axs[i].imshow(rot_sample)
 plt.show()
+
 
 # %%
 # rotation around x
 rotated_angle = [-20, -10, 0, 10, 20]
 fig, axs = plt.subplots(len(rotated_angle), 1, sharey=True, figsize=(5, 20))
 for i in range(len(rotated_angle)):
-    rot_sample = transform(sample, translation=(0, rotated_angle[i]*.85, 0), rotation=(rotated_angle[i], 0, 0))
+    rot_sample = transform(sample, translation=(0, np.sin(np.deg2rad(rotated_angle[i]))*f, (1-np.cos(np.deg2rad(rotated_angle[i])))*f), rotation=(rotated_angle[i], 0, 0))
     axs[i].imshow(rot_sample)
 plt.show()
 
 # %%
-plt.imshow(transform(sample, translation=(40, 0, 0), rotation=(0, 40, 0)))
+# translation from distance change
+dist = [-10, -5, 0, 5, 10]
+fig, axs = plt.subplots(len(dist), 1, sharey=True, figsize=(5, 20))
+for i in range(len(dist)):
+    axs[i].imshow(transform(sample, translation=(0, 0, dist[i])))
 plt.show()

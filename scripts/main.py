@@ -9,7 +9,6 @@ pytorch implementation of PC net
 this branch tests the effects of architectural components on generalisation 
 """
 from fc_net import FcDHPC
-from rf_net_cm import RfDHPC_cm
 import torch.cuda as cuda
 from evaluation import *
 import yaml

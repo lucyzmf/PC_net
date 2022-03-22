@@ -1,4 +1,5 @@
 # this script returns the baseline classification acc on images of dataset
+# contains three different classification methods: knn, pure linear classifier, and logistic regression
 import os
 import time
 
@@ -10,8 +11,6 @@ from sklearn.manifold import TSNE
 from torch.autograd import Variable
 
 from evaluation import *
-
-now = datetime.datetime.now()
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
@@ -40,19 +39,30 @@ config = load_config("config.yaml")
 train_loader = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader.pth'))
 test_loader = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_loader.pth'))
 
+# %%
+train_images = []
+train_labels = []
+test_images = []
+test_labels = []
+
+for i, (_image, _label) in enumerate(train_loader):
+    train_images.append(_image.squeeze().flatten().numpy())
+    train_labels.append(_label.numpy())
+
+for i, (_image, _label) in enumerate(test_loader):
+    test_images.append(_image.squeeze().flatten().numpy())
+    test_labels.append(_label.numpy())
+
+train_images = np.array(train_images)
+train_labels = np.squeeze(np.array(train_labels))
+test_images = np.array(test_images)
+test_labels = np.squeeze(np.array(test_labels))
 
 # %%
 # linear classifier fitted on all samples and tested with stratified kfold knn
-def linear_classifier_kfold(data_loaders):
-    rep_list = []
-    labels_list = []
-    for i in range(len(data_loaders)):
-        for i, (_image, _label) in enumerate(data_loaders[i]):
-            rep_list.append(_image.squeeze().flatten().numpy())
-            labels_list.append(_label.numpy())
-    rep_list = np.array(rep_list)
-    labels_list = np.squeeze(np.array(labels_list))
-    #     print(labels)
+def linear_classifier_kfold(train_images, train_labels, test_images, test_labels):
+    rep_list = np.concatenate((train_images, test_images))
+    labels_list = np.concatenate((train_labels, test_labels))
 
     # Select two samples of each class as test set, classify with knn (k = 5)
     skf = StratifiedKFold(n_splits=5, shuffle=True)  # split into 5 folds
@@ -88,39 +98,23 @@ def linear_classifier_kfold(data_loaders):
 
 # %%
 # acc of linear classifier on images
-rep_list, labels_list, acc_knn = linear_classifier_kfold([train_loader, test_loader])
-print(acc_knn)
+images_all, labels_all, acc_knn = linear_classifier_kfold(train_images, train_labels, test_images, test_labels)
+print('cumulative accuracy over 5 folds for knn classifier %.2f' % acc_knn)
 
 
 # %%
 # linear classifier fitted to train loader images and tested on test loader images
-def linear_classifier(train_loader, test_loader):
-    rep_train, rep_test = [], []
-    labels_train, labels_test = [], []
+def linear_classifier(train_images, train_labels, test_images, test_labels):
 
-    for i, (_image, _label) in enumerate(train_loader):
-        rep_train.append(_image.squeeze().flatten().numpy())
-        labels_train.append(_label.numpy())
-
-    for i, (_image, _label) in enumerate(test_loader):
-        rep_test.append(_image.squeeze().flatten().numpy())
-        labels_test.append(_label.numpy())
-
-    rep_train = np.array(rep_train)
-    rep_test = np.array(rep_test)
-    labels_train = np.squeeze(np.array(labels_train))
-    labels_test = np.squeeze(np.array(labels_test))
-    #     print(labels)
-
-    # avg classification performance over 5 rounds
+    # avg classification performance over 10 rounds
     cumulative_accuracy = 0
-    for i in range(5):
-        labels_train_vec = F.one_hot(torch.tensor(labels_train)).numpy()
-        labels_test_vec = F.one_hot(torch.tensor(labels_test)).numpy()
+    for i in range(10):
+        labels_train_vec = F.one_hot(torch.tensor(train_labels)).numpy()
+        labels_test_vec = F.one_hot(torch.tensor(test_labels)).numpy()
 
         reg = linear_model.LinearRegression()
-        reg.fit(rep_train, labels_train_vec)
-        labels_predicted = reg.predict(rep_test)
+        reg.fit(train_images, labels_train_vec)
+        labels_predicted = reg.predict(test_images)
 
         # Convert to one-hot
         labels_predicted = (labels_predicted == labels_predicted.max(axis=1, keepdims=True)).astype(int)
@@ -128,14 +122,14 @@ def linear_classifier(train_loader, test_loader):
         # Calculate accuracy on test set: put test set into model, calculate fraction of TP+TN over all responses
         accuracy = accuracy_score(labels_test_vec, labels_predicted)
 
-        cumulative_accuracy += accuracy / 5
+        cumulative_accuracy += accuracy / 10
 
     return cumulative_accuracy
 
 
 # %%
-cum_acc = linear_classifier(train_loader, test_loader)
-print('cumulative accuracy over 5 runs for linear classifier %.2f' % cum_acc)
+cum_acc = linear_classifier(train_images, train_labels, test_images, test_labels)
+print('avg accuracy over 5 runs for linear classifier %.4f' % cum_acc)
 
 # %%
 # logreg
@@ -172,7 +166,7 @@ for epoch in range(int(epochs)):
         optimizer.step()
 
         iter += 1
-        if iter % 500 == 0:
+        if iter % 5000 == 0:
             # calculate Accuracy
             correct = 0
             total = 0
@@ -188,14 +182,14 @@ for epoch in range(int(epochs)):
             final_acc = accuracy
             print("Iteration: {}. Loss: {}. Accuracy: {}.".format(iter, loss.item(), accuracy))
 
-print('final classification acc on image itself: %.2f' % final_acc)
+print('final logistic regression classification acc on image itself: %.2f' % final_acc)
 
 # %%
 # use clustering technique on flattened images to examine baseline clusters of dataset
 print('tSNE clustering')
 time_start = time.time()
 tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=1000)
-tsne_results = tsne.fit_transform(rep_list)
+tsne_results = tsne.fit_transform(images_all)
 print('t-SNE done! Time elapsed: {} seconds'.format(time.time() - time_start))
 
 # %%
@@ -203,7 +197,7 @@ print('t-SNE done! Time elapsed: {} seconds'.format(time.time() - time_start))
 df = pandas.DataFrame()
 df['tsne-one'] = tsne_results[:, 0]
 df['tsne-two'] = tsne_results[:, 1]
-df['y'] = labels_list
+df['y'] = labels_all
 fig, ax1 = plt.subplots(figsize=(10, 8))
 sns.scatterplot(
     x="tsne-one", y="tsne-two",

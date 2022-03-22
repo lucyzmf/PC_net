@@ -180,7 +180,7 @@ f = (2 * 28 ** 2) ** .5  # focal length for projection
 # returns: images and class labels that can be loaded into dataloader, a second dictionary that logs the type of each seq
 # these two outputs should have corresponding index for later referencing
 
-def generate_spin_sequence(dataset, rotation_axis, direction, frames=frames_per_sequence, data_width=28):
+def generate_spin_sequence(dataset, rotation_axis, direction, frames=frames_per_sequence, data_width=28, focal=f):
     data_seq = []
     labels = []
 
@@ -191,27 +191,27 @@ def generate_spin_sequence(dataset, rotation_axis, direction, frames=frames_per_
     for i, (_image, _label) in enumerate(dataset):
         _sample = []
         for axis in range(rotation_axis):  # for each rotation axes
-            for dir in range(direction):  # for each rotation direction
+            for direc in range(direction):  # for each rotation direction
                 verti_hori.append(axis)
-                clock_anticlock.append(dir)
+                clock_anticlock.append(direc)
                 seq = torch.empty(frames, data_width, data_width)
-                deg = degrees[dir]
+                deg = degrees[direc]
                 if axis == 0:
                     for fr in range(len(seq)):
                         seq[fr] = transform(_image,
                                             translation=(
-                                                np.sin(np.deg2rad(deg[fr])) * f, 0,
-                                                (1 - np.cos(np.deg2rad(deg[fr]))) * f),
-                                            rotation=(0, rotated_angle[fr], 0))
+                                                np.sin(np.deg2rad(deg[fr])) * focal, 0,
+                                                (1 - np.cos(np.deg2rad(deg[fr]))) * focal),
+                                            rotation=(0, deg[fr], 0))
                     labels.append(_label)
                     _sample.append(seq)
                 else:
                     for fr in range(len(seq)):
                         seq[fr] = transform(_image,
                                             translation=(
-                                                0, np.sin(np.deg2rad(deg[fr])) * f,
-                                                (1 - np.cos(np.deg2rad(deg[fr]))) * f),
-                                            rotation=(rotated_angle[fr], 0, 0))
+                                                0, np.sin(np.deg2rad(deg[fr])) * focal,
+                                                (1 - np.cos(np.deg2rad(deg[fr]))) * focal),
+                                            rotation=(deg[fr], 0, 0))
                     labels.append(_label)
                     _sample.append(seq)
         _sample = torch.stack(_sample)
@@ -270,12 +270,10 @@ test_y = torch.flatten(test_y.repeat(1, frames_per_sequence))
 
 # TODO: save to dataset dir
 
-
 # %%
-# visualise 5 samples of the same class
-idx = torch.tensor(full_dataset.train_labels) == 0
-collage = full_dataset.data[idx]
-collage = collage[:5]
+# visualisation confirmation for correct dataset generation
+rand = 10
+collage = train_x[rand:rand + 5]
 
 fig, axs = plt.subplots(1, 5, sharey=True)
 for i in range(5):

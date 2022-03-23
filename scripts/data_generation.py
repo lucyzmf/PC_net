@@ -70,10 +70,11 @@ test_dataset = Subset(full_dataset, test_indices)
 def transform(image,
               translation=(0, 0, 0),
               rotation=(0, 0, 0),
-              scaling=(1, 1, 1),
-              shearing=(0, 0, 0)):
+              scaling=(1, 1, 1)):
     # get the values on each axis
     image = image.numpy()  # change tensor into numpy array
+    if torch.mean(torch.tensor(image))==0:
+        raise Exception('the issue is in numpy transformation')
 
     t_x, t_y, t_z = translation
     r_x, r_y, r_z = rotation
@@ -105,6 +106,8 @@ def transform(image,
     """
             We will define our matrices here in next parts
                                                             """
+    if torch.mean(torch.tensor(image))==0:
+        raise Exception('error is before identity matrix')
     Identity = np.array([[1, 0, 0, 0],
                          [0, 1, 0, 0],
                          [0, 0, 1, 0],
@@ -117,6 +120,8 @@ def transform(image,
                     [0, 1, 0, t_y],
                     [0, 0, 1, t_z],
                     [0, 0, 0, 1]])
+    if torch.mean(torch.tensor(image))==0:
+        raise Exception('error is in translation')
 
     # calculate cos and sin of angles
     sin_rx, cos_rx = np.sin(theta_rx), np.cos(theta_rx)
@@ -139,12 +144,16 @@ def transform(image,
                      [0, 0, 0, 1]])
     # compute the full rotation matrix
     R_M = np.dot(np.dot(R_Mx, R_My), R_Mz)
+    if torch.mean(torch.tensor(image))==0:
+        raise Exception('error is in rotation')
 
     # get the scaling matrix
     Sc_M = np.array([[sc_x, 0, 0, 0],
                      [0, sc_y, 0, 0],
                      [0, 0, sc_z, 0],
                      [0, 0, 0, 1]])
+    if torch.mean(torch.tensor(image))==0:
+        raise Exception('error is in scaling')
 
     # compute the full transform matrix
     M = Identity
@@ -153,8 +162,16 @@ def transform(image,
     M = np.dot(Sc_M, M)
     # M = np.dot(Sh_M, M)
     M = np.dot(Hp_M, np.dot(M, H_M))
+    if torch.mean(torch.tensor(image))==0:
+        raise Exception('error is in computing M')
     # apply the transformation
     image = cv2.warpPerspective(image, M, (w, h))
+    if torch.mean(torch.tensor(image))==0:
+        print('error is in the cv2 with this M')
+        print(M)
+    else:
+        print('normal transformations are like this ')
+        print(M)
     return torch.tensor(image)
 
 
@@ -196,24 +213,19 @@ def generate_spin_sequence(dataset, rotation_axis, direction, frames=frames_per_
                 clock_anticlock.append(direc)
                 seq = torch.empty(frames, data_width, data_width)
                 deg = degrees[direc]
-                if axis == 0:
-                    for fr in range(len(seq)):
+                for fr in range(len(seq)):
+                    if axis == 0:
                         seq[fr] = transform(_image,
-                                            translation=(
-                                                np.sin(np.deg2rad(deg[fr])) * focal, 0,
-                                                (1 - np.cos(np.deg2rad(deg[fr]))) * focal),
+                                            translation=(np.sin(np.deg2rad(deg[fr])) * focal, 0,
+                                                         (1 - np.cos(np.deg2rad(deg[fr]))) * focal),
                                             rotation=(0, deg[fr], 0))
-                    labels.append(_label)
-                    _sample.append(seq)
-                else:
-                    for fr in range(len(seq)):
+                    else:
                         seq[fr] = transform(_image,
-                                            translation=(
-                                                0, np.sin(np.deg2rad(deg[fr])) * focal,
-                                                (1 - np.cos(np.deg2rad(deg[fr]))) * focal),
+                                            translation=(0, np.sin(np.deg2rad(deg[fr])) * focal,
+                                                         (1 - np.cos(np.deg2rad(deg[fr]))) * focal),
                                             rotation=(deg[fr], 0, 0))
-                    labels.append(_label)
-                    _sample.append(seq)
+                labels.append(_label)
+                _sample.append(seq)
         _sample = torch.stack(_sample)
         data_seq.append(_sample)
 
@@ -240,17 +252,31 @@ def shuffle(data):  # take tensor datasets and targets and returns shuffled data
 # generate train sequence
 train_x, train_y, train_log = generate_spin_sequence(train_dataset, rotation_axis, direction)
 
+# %%
 # shuffle sequence, targets, and log
-train_x = shuffle(train_x)
-train_y = shuffle(train_y)
-train_log['rotation_axis'] = shuffle(train_log['rotation_axis'])
-train_log['direction'] = shuffle(train_log['direction'])
+# train_x = shuffle(train_x)
+# train_y = shuffle(train_y)
+# train_log['rotation_axis'] = shuffle(train_log['rotation_axis'])
+# train_log['direction'] = shuffle(train_log['direction'])
 
 # %%
 # collapse first two dimensions of train_x, add dimension to train_y
 train_x = train_x.view(-1, data_width, data_width)
 train_y = torch.unsqueeze(train_y, dim=1)
 train_y = torch.flatten(train_y.repeat(1, frames_per_sequence))
+
+# %%
+# visualisation confirmation for correct dataset generation
+rand = [0,5,10,15]
+
+fig, axs = plt.subplots(len(rand), 5, sharey=True)
+for k in range(len(rand)):
+    collage = train_x[rand[k]:rand[k] + 5]
+    for i in range(5):
+        axs[k][i].imshow(collage[i])
+
+plt.show()
+
 
 # %%
 # generate test sequence
@@ -269,56 +295,57 @@ test_y = torch.unsqueeze(test_y, dim=1)
 test_y = torch.flatten(test_y.repeat(1, frames_per_sequence))
 
 # TODO: save to dataset dir
+# TODO: some images work but some not 
 
-# %%
-# visualisation confirmation for correct dataset generation
-rand = 10
-collage = train_x[rand:rand + 5]
 
-fig, axs = plt.subplots(1, 5, sharey=True)
-for i in range(5):
-    axs[i].imshow(collage[i])
-
-plt.show()
-
-# %%
-# trial sequence generation with one image
-sample, label = train_dataset[0]
-sample = torch.squeeze(sample).numpy()
-
-# %%
-plt.imshow(sample)
-plt.show()
 
 # %%
 
-
-# %%
-# rotation around y
-rotated_angle = [-20, -10, 0, 10, 20]
-fig, axs = plt.subplots(len(rotated_angle), 1, sharey=True, figsize=(5, 20))
-for i in range(len(rotated_angle)):
-    rot_sample = transform(sample, translation=(
-        np.sin(np.deg2rad(rotated_angle[i])) * f, 0, (1 - np.cos(np.deg2rad(rotated_angle[i]))) * f),
-                           rotation=(0, rotated_angle[i], 0))
-    axs[i].imshow(rot_sample)
-plt.show()
-
+# # %%
+# # trial sequence generation with one image
+# sample, label = train_dataset[0]
+# sample = torch.squeeze(sample).numpy()
+#
+# # %%
+# plt.imshow(sample)
+# plt.show()
+#
+# # %%
+#
+#
+# # %%
+# # rotation around y
+# rotated_angle = [-20, -10, 0, 10, 20]
+# fig, axs = plt.subplots(len(rotated_angle), 1, sharey=True, figsize=(5, 20))
+# for i in range(len(rotated_angle)):
+#     rot_sample = transform(sample, translation=(
+#         np.sin(np.deg2rad(rotated_angle[i])) * f, 0, (1 - np.cos(np.deg2rad(rotated_angle[i]))) * f),
+#                            rotation=(0, rotated_angle[i], 0))
+#     axs[i].imshow(rot_sample)
+# plt.show()
+#
 # %%
 # rotation around x
+sample = train_x[57]
+seq = []
 rotated_angle = [-20, -10, 0, 10, 20]
 fig, axs = plt.subplots(len(rotated_angle), 1, sharey=True, figsize=(5, 20))
 for i in range(len(rotated_angle)):
-    rot_sample = transform(sample, translation=(
-        0, np.sin(np.deg2rad(rotated_angle[i])) * f, (1 - np.cos(np.deg2rad(rotated_angle[i]))) * f),
+    rot_sample = transform(sample,
+                           translation=(
+                               0,np.sin(np.deg2rad(rotated_angle[i])) * f,
+                               (1 - np.cos(np.deg2rad(rotated_angle[i]))) * f),
                            rotation=(rotated_angle[i], 0, 0))
-    axs[i].imshow(rot_sample)
+    seq.append(rot_sample)
+
+for i in range(len(rotated_angle)):
+    axs[i].imshow(seq[i])
 plt.show()
 
-# %%
-# translation from distance change
-dist = [-10, -5, 0, 5, 10]
-fig, axs = plt.subplots(len(dist), 1, sharey=True, figsize=(5, 20))
-for i in range(len(dist)):
-    axs[i].imshow(transform(sample, translation=(0, 0, dist[i])))
-plt.show()
+# # %%
+# # translation from distance change
+# dist = [-10, -5, 0, 5, 10]
+# fig, axs = plt.subplots(len(dist), 1, sharey=True, figsize=(5, 20))
+# for i in range(len(dist)):
+#     axs[i].imshow(transform(sample, translation=(0, 0, dist[i])))
+# plt.show()

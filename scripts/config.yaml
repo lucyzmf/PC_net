@@ -14,7 +14,7 @@ epochs: 100
 infsteps: 100
 infrates: [.1, .1, .1]
 network_size: [1444, 700, 50]
-learning_rate: .05
+learning_rate: .01
 act_func: sigmoid
 per_seq_repeat: 1
 

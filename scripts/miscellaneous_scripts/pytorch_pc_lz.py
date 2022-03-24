@@ -4,21 +4,16 @@
 pytorch implementation of deep hebbian predictive coding(DHPC) net that enables relatively flexible maniputation of network architecture
 code inspired by Matthias's code of PCtorch
 """
+import math
+
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import scipy
-import math
-import matplotlib
-import matplotlib.pyplot as plt
-from sklearn.metrics import pairwise_distances  # computes the pairwise distance between observations
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-import pickle
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import accuracy_score
 from sklearn import linear_model
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import pairwise_distances  # computes the pairwise distance between observations
+from sklearn.model_selection import StratifiedKFold
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"

@@ -9,6 +9,7 @@ import torch.profiler
 import yaml
 from sklearn.manifold import TSNE
 from torch.autograd import Variable
+from torch.utils.data import DataLoader
 
 from evaluation import *
 
@@ -34,29 +35,29 @@ def load_config(config_name):
 
 config = load_config("config.yaml")
 
+padding = config['padding_size']
+data_width = 28+padding*2
+num_classes = 10
+
 # %%
 # load images
-train_loader = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader.pth'))
-test_loader = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_loader.pth'))
+train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
+test_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
 
 # %%
-train_images = []
-train_labels = []
-test_images = []
-test_labels = []
+train_indices = train_set.indices
+test_indices = test_set.indices
 
-for i, (_image, _label) in enumerate(train_loader):
-    train_images.append(_image.squeeze().flatten().numpy())
-    train_labels.append(_label.numpy())
+# %%
+train_images = train_set.dataset.data[train_indices]
+train_images = torch.flatten(train_images, start_dim=1).numpy()
+train_labels = train_set.dataset.targets[train_indices].numpy()
 
-for i, (_image, _label) in enumerate(test_loader):
-    test_images.append(_image.squeeze().flatten().numpy())
-    test_labels.append(_label.numpy())
+# %%
+test_images = test_set.dataset.data[test_indices]
+test_images = torch.flatten(test_images, start_dim=1).numpy()
+test_labels = test_set.dataset.targets[test_indices].numpy()
 
-train_images = np.array(train_images)
-train_labels = np.squeeze(np.array(train_labels))
-test_images = np.array(test_images)
-test_labels = np.squeeze(np.array(test_labels))
 
 # %%
 # linear classifier fitted on all samples and tested with stratified kfold knn
@@ -144,19 +145,22 @@ class LogisticRegression(torch.nn.Module):
         return outputs
 
 
-classifier = LogisticRegression(784, 10)
+classifier = LogisticRegression(data_width**2, 10)
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(classifier.parameters(), lr=.001)
 classifier.to(device)
 
 # %%
 # train and test classifier
+train_loader = DataLoader(train_set, shuffle=True)
+test_loader = DataLoader(test_set, shuffle=True)
+
 epochs = 200
 iter = 0
 final_acc = 0
 for epoch in range(int(epochs)):
     for i, (images, labels) in enumerate(train_loader):
-        images = Variable(images.view(-1, 784)).to(device)
+        images = Variable(images.view(-1, data_width**2)).to(device)
         labels = Variable(labels).to(device)
 
         optimizer.zero_grad()
@@ -171,7 +175,7 @@ for epoch in range(int(epochs)):
             correct = 0
             total = 0
             for i, (_images, _labels) in enumerate(test_loader):
-                _images = Variable(_images.view(-1, 784)).to(device)
+                _images = Variable(_images.view(-1, data_width**2)).to(device)
                 _labels = Variable(_labels).to(device)
                 outputs = classifier(_images)
                 _, predicted = torch.max(outputs.data, 1)

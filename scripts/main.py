@@ -139,15 +139,16 @@ if __name__ == '__main__':
                 with_stack=True
         ) as p:
             for epoch in range(epochs):
-
+            # TODO: update training loop to suit sequences
                 errors = []  # log total error per sample in dataset
                 last_layer_act = []  # log avg act of last layer neurons per sample
 
                 for i, (image, label) in enumerate(train_loader):
-                    net.init_states()
+                    if i % frame_per_seq == 0:
+                        net.init_states()
                     for j in range(per_seq_repeat):
                         net(image, inference_steps)
-                    net.learn()
+                        net.learn()
                     errors.append(net.total_error())
 
                     if i % 50 == 0:  # log every 50 steps

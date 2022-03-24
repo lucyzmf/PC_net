@@ -126,6 +126,7 @@ if __name__ == '__main__':
         # prepare profiler
         profile_dir = "../results/" + str(now) + '/trace/'
         trained_model_dir = "../results/" + str(now) + '/trained_model/'
+        os.mkdir(trained_model_dir)
         with torch.profiler.profile(
                 activities=[
                     torch.profiler.ProfilerActivity.CPU,
@@ -182,12 +183,11 @@ if __name__ == '__main__':
 
             if epoch == epochs - 1:
                 print('end training, saving trained model')
-                os.mkdir(trained_model_dir)
-                torch.save(net.state_dict(), trained_model_dir + str(arch_type) + str(net.architecture) + str(
-                    net.inf_rates) + 'readout.pth')
+                torch.save(net.state_dict(), trained_model_dir + str(config['morph_type']) + str(net.architecture) +
+                           str(net.inf_rates) + 'readout.pth')
 
             if (epoch % 10 == 0) and (epoch != 0):
-                # test classification
+                # get error on single frames
                 errors_test = []
                 for i, (image, label) in enumerate(test_loader):
                     net.init_states()

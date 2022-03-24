@@ -16,6 +16,7 @@ import os
 import numpy as np
 import torch.profiler
 import datetime
+from scripts.rf_net_cm import RfDHPC_cm
 
 now = datetime.datetime.now()
 
@@ -48,29 +49,33 @@ if __name__ == '__main__':
 
     dtype = torch.float  # Set standard datatype
 
+    # git config values
+    dataset = config['dataset_type']
+    inference_steps = config['infsteps']  # num infsteps per image
+    epochs = config['epochs']  # total training epochs
+    infrates = config['infrates']  # inf rates each layer
+    lr = config['learning_rate']  # lr for weight updates
+    arch = config['network_size']  # size of each layer
+    per_seq_repeat = config['per_seq_repeat']  # num of repeats per image/sequence
+    arch_type = config['architecture']
+    morph_type = config['morph_type']
+    frame_per_seq = config['frame_per_sequence']
+
     # load data
-    train_loader = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader.pth'))
-    test_loader = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_loader.pth'))
+    train_loader = torch.load(os.path.join(config['dataset_dir'], str(dataset) + 'train_loader_' + str(morph_type) + '.pth'))
+    test_loader = torch.load(os.path.join(config['dataset_dir'], str(dataset) + 'test_loader_' + str(morph_type) + '.pth'))
 
     # %%
     ###########################
     ### Training loop
     ###########################
-    # meta data on MNIST dataset
-    numClass = len(train_loader.dataset.dataset.classes)
-    dataWidth = len(train_loader.dataset.dataset.data[0])
-
     with torch.no_grad():  # turn off auto grad function
-        inference_steps = config['infsteps']  # num infsteps per image
-        epochs = config['epochs']  # total training epochs
-        infrates = config['infrates']  # inf rates each layer
-        lr = config['learning_rate']  # lr for weight updates
-        arch = config['network_size']  # size of each layer
-        per_seq_repeat = config['per_seq_repeat']  # num of repeats per image/sequence
-        arch_type = config['architecture']
+        # meta data on MNIST dataset
+        numClass = len(train_loader.dataset.dataset.classes)
+        dataWidth = len(train_loader.dataset.dataset.data[0])
 
         # Hyperparameters for training logged with wandb
-        wandb.init(project="DHPC", entity="lucyzmf")  # , mode='disabled')
+        wandb.init(project="DHPC_morph", entity="lucyzmf")  # , mode='disabled')
 
         wbconfig = wandb.config
         wbconfig.infstep = inference_steps
@@ -79,6 +84,8 @@ if __name__ == '__main__':
         wbconfig.network_size = arch
         wbconfig.architecture = arch_type
         wbconfig.lr = lr
+        wbconfig.frame_per_seq = frame_per_seq
+        wbconfig.morph = morph_type
         wbconfig.per_seq_repeat = per_seq_repeat
         wbconfig.batch_size = config['batch_size']
         wbconfig.train_size = config['train_size']

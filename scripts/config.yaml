@@ -24,4 +24,4 @@ rf_sizes: [5, 9, 15]
 
 # used to generate morphing dataset
 frame_per_sequence: 5
-morphe_type: spin
+morph_type: spin

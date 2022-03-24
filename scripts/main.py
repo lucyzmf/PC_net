@@ -126,7 +126,7 @@ if __name__ == '__main__':
         # prepare profiler
         profile_dir = "../results/" + str(now) + '/trace/'
         trained_model_dir = "../results/" + str(now) + '/trained_model/'
-        os.mkdir(trained_model_dir)
+        os.makedirs(trained_model_dir)
         with torch.profiler.profile(
                 activities=[
                     torch.profiler.ProfilerActivity.CPU,

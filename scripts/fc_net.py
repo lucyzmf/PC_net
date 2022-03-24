@@ -57,8 +57,8 @@ class FCLayer(nn.Module):
     def w_update(self, e_act, nextlayer_output):
         # Learning step
         delta = self.learn_rate * torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1))
-        # self.weights = nn.Parameter(torch.clamp(self.weights + delta, min=0))  # Keep only positive weights
-        self.weights = nn.Parameter(self.weights + delta)  # keep both positive and negative weights
+        self.weights = nn.Parameter(torch.clamp(self.weights + delta, min=0))  # Keep only positive weights
+        # self.weights = nn.Parameter(self.weights + delta)  # keep both positive and negative weights
 
 
 class input_layer(FCLayer):

@@ -156,7 +156,7 @@ if __name__ == '__main__':
                     net.init_states()
                 for j in range(per_seq_repeat):
                     net(image, inference_steps)
-                    net.learn()
+                net.learn()
                 errors.append(net.total_error())
 
                 if i % 50 == 0:  # log every 50 steps

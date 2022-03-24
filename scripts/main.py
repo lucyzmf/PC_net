@@ -139,7 +139,7 @@ if __name__ == '__main__':
                 profile_memory=True,  # This will take 1 to 2 minutes. Setting it to False could greatly speedup.
                 with_stack=True
         ) as p:
-            data, target = train_loader[0]
+            data, target = train_loader.dataset[0]
             net.init_states()
             net(data, inference_steps)
             net.learn()

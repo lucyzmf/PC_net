@@ -16,7 +16,7 @@ import os
 import numpy as np
 import torch.profiler
 import datetime
-from scripts.rf_net_cm import RfDHPC_cm
+from rf_net_cm import RfDHPC_cm
 
 now = datetime.datetime.now()
 

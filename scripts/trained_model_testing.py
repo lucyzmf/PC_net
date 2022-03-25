@@ -8,7 +8,6 @@ import time
 import pandas
 import seaborn as sns
 import yaml
-from rf_net_cm import RfDHPC_cm
 from sklearn.manifold import TSNE
 from torch.autograd import Variable
 from torch.utils import data
@@ -16,6 +15,9 @@ from torch.utils.data import DataLoader
 
 from evaluation import *
 from fc_net import FcDHPC
+from rf_net_cm import RfDHPC_cm
+
+# TODO change representation generation function since on trained dataset it should be representations generated from sequences
 
 # load config
 CONFIG_PATH = "../scripts/"

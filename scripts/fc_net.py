@@ -56,7 +56,7 @@ class FCLayer(nn.Module):
 
     def w_update(self, e_act, nextlayer_output):
         # l1 regularisation
-        l1_reg = self.weights
+        l1_reg = torch.clone(self.weights)
         l1_reg[l1_reg > 0] = 1
         l1_reg[l1_reg < 0] = -1
         # Learning step

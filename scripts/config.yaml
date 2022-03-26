@@ -19,7 +19,7 @@ act_func: sigmoid
 per_seq_repeat: 1
 
 # network architecture: FcDHPC,RfDHPC_cm
-architecture: RfDHPC_cm
+architecture: FcDHPC
 rf_sizes: [5, 9, 15]
 
 # used to generate morphing dataset

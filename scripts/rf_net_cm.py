@@ -81,7 +81,7 @@ class Rf_PredLayer(nn.Module):
         l1_reg[l1_reg > 0] = -1
         l1_reg[l1_reg < 0] = 1
         # Learning step
-        delta = self.learn_rate * (torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1)) + l1_reg)
+        delta = self.learn_rate * (torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1)) - l1_reg)
         # delta = self.learn_rate * torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1))
         self.weights = nn.Parameter((self.weights + delta) * self.connectivity_map) # get rid of extra rf connections
 

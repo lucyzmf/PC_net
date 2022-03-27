@@ -154,7 +154,7 @@ class FcDHPC(nn.Module):
             r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
                                               r_act[-1])
 
-            if i > 0 and i % 20 == 0:
+            if i > 0 and i % 50 == 0:
                 self.learn()
 
     def learn(self):

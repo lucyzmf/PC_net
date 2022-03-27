@@ -168,7 +168,8 @@ if __name__ == '__main__':
                         'last layer output distribution': wandb.Histogram(
                             net.states['r_output'][-1].detach().cpu()),
                         'layer n-1 weights': wandb.Histogram(net.layers[-2].weights.detach().cpu()),
-                        'layer n-1 output distribution': wandb.Histogram(net.states['r_output'][-2].detach().cpu())
+                        'layer n-1 output distribution': wandb.Histogram(net.states['r_output'][-2].detach().cpu()),
+                        'layer n-1 error activation': wandb.Histogram(net.states['error'][-2].detach().cpu())
                     })
 
             # summary data

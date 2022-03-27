@@ -36,7 +36,7 @@ class FCLayer(nn.Module):
 
     def reset_parameters(self) -> None:  # initialise or reset layer weight
         nn.init.normal_(self.weights, 0, 0.5)  # normal distribution
-        # self.weights = torch.clamp(self.weights, min=0)  # weights clamped to above 0
+        self.weights = torch.clamp(self.weights, min=0)  # weights clamped to above 0
         self.weights = self.weights / self.layer_size  # normalise weights given next layer size
 
     # def reset_state(self):
@@ -59,8 +59,8 @@ class FCLayer(nn.Module):
         l1_reg = -torch.sign(torch.clone(self.weights))
         # Learning step
         delta = self.learn_rate * (torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1)) + l1_reg)
-        # self.weights = nn.Parameter(torch.clamp(self.weights + delta, min=0))  # Keep only positive weights
-        self.weights = nn.Parameter(self.weights + delta)  # keep both positive and negative weights
+        self.weights = nn.Parameter(torch.clamp(self.weights + delta, min=0))  # Keep only positive weights
+        # self.weights = nn.Parameter(self.weights + delta)  # keep both positive and negative weights
 
 
 class input_layer(FCLayer):

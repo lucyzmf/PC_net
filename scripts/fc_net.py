@@ -35,8 +35,8 @@ class FCLayer(nn.Module):
         self.device = device
 
     def reset_parameters(self) -> None:  # initialise or reset layer weight
-        # nn.init.normal_(self.weights, 0, 0.5)  # normal distribution
-        nn.init.constant_(self.weights, 0.5)  # constant distribution
+        nn.init.normal_(self.weights, 0, 0.5)  # normal distribution
+        # nn.init.constant_(self.weights, 0.5)  # constant distribution
         self.weights = torch.clamp(self.weights, min=0)  # weights clamped to above 0
         self.weights = self.weights / self.layer_size  # normalise weights given next layer size
 
@@ -57,7 +57,8 @@ class FCLayer(nn.Module):
 
     def w_update(self, e_act, nextlayer_output):
         # l1 regularisation
-        l1_reg = -torch.sign(torch.clone(self.weights))
+        # l1_reg = -torch.sign(torch.clone(self.weights))
+        l1_reg = 0
         # Learning step
         delta = self.learn_rate * (torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1)) + l1_reg)
         self.weights = nn.Parameter(torch.clamp(self.weights + delta, min=0))  # Keep only positive weights

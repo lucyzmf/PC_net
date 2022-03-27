@@ -77,9 +77,8 @@ class Rf_PredLayer(nn.Module):
 
     def w_update(self, e_act, nextlayer_output):
         # Learning step
-        l1_reg = torch.clone(self.weights)
-        l1_reg[l1_reg > 0] = -1
-        l1_reg[l1_reg < 0] = 1
+        l1_reg = torch.sign(torch.clone(self.weights))
+        l1_reg = l1_reg * self.weights
         # Learning step
         delta = self.learn_rate * (torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1)) - l1_reg)
         # delta = self.learn_rate * torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1))

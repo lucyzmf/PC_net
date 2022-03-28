@@ -1,17 +1,7 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-import math
-import matplotlib
-import matplotlib.pyplot as plt
-import sklearn
-
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-
-from scipy.spatial.distance import squareform, euclidean                        # transforms a 1D vector to symetircal matrix or a matrix to a 1D vector
-from sklearn.metrics import pairwise_distances                                  # computes the pairwise distance between observations
-from sklearn.linear_model import LinearRegression
-from sklearn.utils import shuffle
+from sklearn.metrics import pairwise_distances  # computes the pairwise distance between observations
 
 # %%
 ####################################

@@ -121,6 +121,7 @@ for epoch in range(wbconfig.num_epochs):
         outputs = model(images)
         loss = criterion(outputs, labels)
         wandb.log({
+            'epoch': epoch
             'loss': loss
         })
 

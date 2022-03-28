@@ -114,7 +114,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=wbconfig.learning_rate)
 total_step = len(train_loader)
 for epoch in range(wbconfig.num_epochs):
     for i, (images, labels) in enumerate(train_loader):
-        images = torch.unsqueeze(images, dim=0).to(device)
+        images = torch.unsqueeze(images, dim=1).to(device)
         labels = labels.to(device)
 
         # Forward pass
@@ -141,7 +141,7 @@ for epoch in range(wbconfig.num_epochs):
             correct = 0
             total = 0
             for images, labels in still_img_loader:
-                images = torch.unsqueeze(images.float(), dim=0).to(device)
+                images = torch.unsqueeze(images.float(), dim=1).to(device)
                 labels = labels.to(device)
                 outputs = model(images)
                 _, predicted = torch.max(outputs.data, 1)

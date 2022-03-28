@@ -216,7 +216,7 @@ if __name__ == '__main__':
                 # use linear classifier to test train and test dataset classification performance
                 seq_rep_train = np.vstack(seq_rep_train)
                 seq_label_train = torch.concat(seq_label_train).numpy()
-                seq_rep_test = np.vstack(seq_label_test)
+                seq_rep_test = np.vstack(seq_rep_test)
                 seq_label_test = torch.concat(seq_label_test).numpy()
 
                 acc_train, acc_test = linear_classifier(seq_rep_train, seq_label_train, seq_rep_test, seq_label_test)

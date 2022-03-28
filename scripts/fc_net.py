@@ -140,7 +140,7 @@ class FcDHPC(nn.Module):
             self.states['r_activation'][i] = -2 * torch.ones(self.architecture[i]).to(self.device)
             self.states['r_output'][i] = self.layers[i].actFunc(self.states['r_activation'][i])
 
-    def forward(self, frame, inference_steps):
+    def forward(self, frame, inference_steps, istrain=True):
         # frame is input to the lowest layer, inference steps
         e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
         layers = self.layers
@@ -158,8 +158,9 @@ class FcDHPC(nn.Module):
             r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
                                               r_act[-1])
 
-            if i > 0 and i % 25 == 0:
-                self.learn()
+            # if i > 0 and i % 25 == 0:
+            #     if istrain:
+            #         self.learn()
 
     def learn(self):
         # iterate through all non last layers to update weights

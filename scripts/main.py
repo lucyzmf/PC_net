@@ -153,10 +153,10 @@ if __name__ == '__main__':
         for epoch in range(epochs):
             errors = []  # log total error per sample in dataset
             last_layer_act = []  # log avg act of last layer neurons per sample
+            seq_rep_train, seq_label_train = [], []  # log high level representations at the end of each sequence to test classification
+            seq_rep_test, seq_label_test = [], []
 
             for i, (image, label) in enumerate(train_loader):
-                if i % frame_per_seq == 0:
-                    net.init_states()
                 for j in range(per_seq_repeat):
                     net(image, inference_steps)
                 net.learn()
@@ -175,6 +175,12 @@ if __name__ == '__main__':
                         'layer 0 error activation': wandb.Histogram(net.states['error'][0].detach().cpu())
                     })
 
+                if (i+1) % frame_per_seq == 0:  # at the end of each sequence
+                    if epoch % 10 == 0 :
+                        seq_rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
+                        seq_label_train.append(label)
+                    net.init_states()
+
             # summary data
             total_errors.append(np.mean(errors))  # mean error per epoch
             last_layer_act_log.append(np.mean(last_layer_act))  # mean last layer activation per epoch
@@ -190,24 +196,38 @@ if __name__ == '__main__':
                 torch.save(net.state_dict(), trained_model_dir + str(config['morph_type']) + str(net.architecture) +
                            str(net.inf_rates) + 'readout.pth')
 
-            if (epoch % 10 == 0) and (epoch != 0):
+            if epoch % 10 == 0:  # evaluation every 10 epochs
                 # get error on single frames
                 errors_test = []
+                net.init_states()
                 for i, (image, label) in enumerate(test_loader):
-                    net.init_states()
                     net(image, inference_steps)
                     errors_test.append(net.total_error())
+                    if (i + 1) % frame_per_seq == 0:  # at the end of each sequence
+                        seq_rep_test.append(net.states['r_activation'][-1].detach().cpu().numpy())
+                        seq_label_test.append(label)
+                        net.init_states()
+
                 total_errors_test.append(np.mean(errors_test))
                 print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' %
                       (epoch, total_errors[-1], last_layer_act_log[-1]))
                 print('total error on test set: %.4f' % (total_errors_test[-1]))
-                # reg_acc_train = test_accuracy(net, train_loader)
-                # reg_acc_test = test_accuracy(net, test_loader)
+
+                # use linear classifier to test train and test dataset classification performance
+                seq_rep_train = np.vstack(seq_rep_train)
+                seq_label_train = torch.concat(seq_label_train).numpy()
+                seq_rep_test = np.vstack(seq_label_test)
+                seq_label_test = torch.concat(seq_label_test).numpy()
+
+                acc_train, acc_test = linear_classifier(seq_rep_train, seq_label_train, seq_rep_test, seq_label_test)
+                print('epoch: %i: classification performance on representation at the end of each sequence '
+                      '(train data): %.4f, on test data: %.4f' % (epoch, acc_train, acc_test))
+
 
                 wandb.log({
                     'test_error': total_errors_test[-1],
-                    # 'reg acc on train set': reg_acc_train,
-                    # 'reg acc on test set': reg_acc_test
+                    'linear classification acc on train set': acc_train,
+                    'linear classification acc on test set': acc_test
                 })
 
                 # sample reconstruction

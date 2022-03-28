@@ -15,7 +15,7 @@ infsteps: 100
 infrates: [.1, .1, .1]
 network_size: [1444, 100]
 learning_rate: .005
-act_func: sigmoid  # relu, sigmoid
+act_func: relu  # relu, sigmoid
 per_seq_repeat: 1
 
 # network architecture: FcDHPC,RfDHPC_cm

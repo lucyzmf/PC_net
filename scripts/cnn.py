@@ -39,7 +39,7 @@ torch.manual_seed(0)
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
     print("Cuda is available")
-    cuda.manual_seed_all(0)
+    # cuda.manual_seed_all(0)
 
 else:
     dev = "cpu"

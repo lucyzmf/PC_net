@@ -120,6 +120,9 @@ for epoch in range(wbconfig.num_epochs):
         # Forward pass
         outputs = model(images)
         loss = criterion(outputs, labels)
+        wandb.log({
+            'loss': loss
+        })
 
         # Backward and optimize
         optimizer.zero_grad()
@@ -130,20 +133,25 @@ for epoch in range(wbconfig.num_epochs):
             print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
                   .format(epoch + 1, wbconfig.num_epochs, i + 1, total_step, loss.item()))
 
-# Test the model
-model.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
-with torch.no_grad():
-    correct = 0
-    total = 0
-    for images, labels in still_img_loader:
-        images = torch.unsqueeze(images.float(), dim=0).to(device)
-        labels = labels.to(device)
-        outputs = model(images)
-        _, predicted = torch.max(outputs.data, 1)
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+    if (i + 1) % 10 == 0:
+        # Test the model
+        model.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
+        with torch.no_grad():
+            correct = 0
+            total = 0
+            for images, labels in still_img_loader:
+                images = torch.unsqueeze(images.float(), dim=0).to(device)
+                labels = labels.to(device)
+                outputs = model(images)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
 
-    print('Test Accuracy of the model on test images: {} %'.format(100 * correct / total))
+            wandb.log({
+                'test_acc': 100 * correct / total
+            })
+
+            print('Test Accuracy of the model on test images: {} %'.format(100 * correct / total))
 
 # Save the model checkpoint
 torch.save(model.state_dict(), 'model.ckpt')

@@ -147,6 +147,8 @@ if __name__ == '__main__':
             # profiler step boundary
             p.step()
 
+        net.init_states()
+
         # finish profiling of one image, start training
         for epoch in range(epochs):
             errors = []  # log total error per sample in dataset

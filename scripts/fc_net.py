@@ -14,6 +14,10 @@ def sigmoid(inputs):
     m = nn.Sigmoid()
     return m(inputs)
 
+def relu(inputs):
+    m = nn.ReLU()
+    return m(inputs)
+
 
 class FCLayer(nn.Module):
     #  object class for standard layer in DHPC with error and representational units

@@ -36,7 +36,7 @@ def load_config(config_name):
 config = load_config("config.yaml")
 
 padding = config['padding_size']
-data_width = 28+padding*2
+data_width = 28 + padding * 2
 num_classes = 10
 
 # %%
@@ -106,15 +106,22 @@ print('cumulative accuracy over 5 folds for knn classifier %.2f' % acc_knn)
 # %%
 # linear classifier fitted to train loader images and tested on test loader images
 def linear_classifier(train_images, train_labels, test_images, test_labels):
-
     # avg classification performance over 10 rounds
-    cumulative_accuracy = 0
+    cumulative_accuracy_train = 0
+    cumulative_accuracy_test = 0
     for i in range(10):
         labels_train_vec = F.one_hot(torch.tensor(train_labels)).numpy()
         labels_test_vec = F.one_hot(torch.tensor(test_labels)).numpy()
 
         reg = linear_model.LinearRegression()
         reg.fit(train_images, labels_train_vec)
+        # assess train set acc
+        labels_predicted_train = reg.predict(train_images)
+        labels_predicted_train = (labels_predicted_train == labels_predicted_train.max(axis=1, keepdims=True)).astype(int)
+        acc_train = accuracy_score(labels_train_vec, labels_predicted_train)
+        cumulative_accuracy_train += acc_train / 10
+
+        # assess performance on test set
         labels_predicted = reg.predict(test_images)
 
         # Convert to one-hot
@@ -123,14 +130,16 @@ def linear_classifier(train_images, train_labels, test_images, test_labels):
         # Calculate accuracy on test set: put test set into model, calculate fraction of TP+TN over all responses
         accuracy = accuracy_score(labels_test_vec, labels_predicted)
 
-        cumulative_accuracy += accuracy / 10
+        cumulative_accuracy_test += accuracy / 10
 
-    return cumulative_accuracy
+    return cumulative_accuracy_train, cumulative_accuracy_test
 
 
 # %%
-cum_acc = linear_classifier(train_images, train_labels, test_images, test_labels)
-print('avg accuracy over 5 runs for linear classifier %.4f' % cum_acc)
+cum_acc_train, cum_acc_test = linear_classifier(train_images, train_labels, test_images, test_labels)
+print('avg accuracy over 10 runs for linear classifier on train set %.4f' % cum_acc_train)
+print('avg accuracy over 10 runs for linear classifier on test set %.4f' % cum_acc_test)
+
 
 # %%
 # logreg
@@ -145,7 +154,7 @@ class LogisticRegression(torch.nn.Module):
         return outputs
 
 
-classifier = LogisticRegression(data_width**2, 10)
+classifier = LogisticRegression(data_width ** 2, 10)
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(classifier.parameters(), lr=.001)
 classifier.to(device)
@@ -160,7 +169,7 @@ iter = 0
 final_acc = 0
 for epoch in range(int(epochs)):
     for i, (images, labels) in enumerate(train_loader):
-        images = Variable(images.view(-1, data_width**2)).to(device)
+        images = Variable(images.view(-1, data_width ** 2)).to(device)
         labels = Variable(labels).to(device)
 
         optimizer.zero_grad()
@@ -175,7 +184,7 @@ for epoch in range(int(epochs)):
             correct = 0
             total = 0
             for i, (_images, _labels) in enumerate(test_loader):
-                _images = Variable(_images.view(-1, data_width**2)).to(device)
+                _images = Variable(_images.view(-1, data_width ** 2)).to(device)
                 _labels = Variable(_labels).to(device)
                 outputs = classifier(_images)
                 _, predicted = torch.max(outputs.data, 1)
@@ -216,3 +225,116 @@ sns.scatterplot(
 plt.title('tSNE clustering baseline on fashionMNIST images ')
 plt.show()
 fig.savefig(os.path.join(config['dataset_dir'], 'tSNE_clustering_rep'))
+
+# %%
+# classification of sequence training images
+train_set_spin = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader_spin.pth'))
+test_set_spin = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_loader_spin.pth'))
+
+# %%
+train_seq_spin, train_labels_spin = [], []
+for i, (_frame, _label) in enumerate(train_set_spin):
+    train_seq_spin.append(torch.flatten(_frame).data.numpy())
+    train_labels_spin.append(_label.data)
+
+train_seq_spin = np.vstack(train_seq_spin)
+train_labels_spin = torch.concat(train_labels_spin).numpy()
+
+# %%
+test_seq_spin, test_labels_spin = [], []
+for i, (_frame, _label) in enumerate(test_set_spin):
+    test_seq_spin.append(torch.flatten(_frame).data.numpy())
+    test_labels_spin.append(_label.data)
+
+test_seq_spin = np.vstack(test_seq_spin)
+test_labels_spin = torch.concat(test_labels_spin).numpy()
+
+# %%
+cum_acc_train_spin, cum_acc_test_spin = linear_classifier(train_seq_spin, train_labels_spin, test_seq_spin, test_labels_spin)
+print('avg accuracy over 10 runs for linear classifier on sequence train dataset %.4f' % cum_acc_train_spin)
+print('avg accuracy over 10 runs for linear classifier on sequence test dataset %.4f' % cum_acc_test_spin)
+
+
+# %%
+# acc of linear classifier on images
+images_all_spin, labels_all_spin, acc_knn_spin = linear_classifier_kfold(train_seq_spin, train_labels_spin, test_seq_spin, test_labels_spin)
+print('cumulative accuracy over 5 folds for knn classifier on sequence dataset (train and test) %.4f' % acc_knn)
+
+
+# %%
+#######################
+# visualisation of sequence statistics
+#######################
+
+# rdm of train images
+# sort labels first
+sorted_label, indices = torch.sort(torch.tensor(train_labels))
+train_labels = train_labels[indices]
+train_images = train_images[indices]
+
+pair_dist_cosine = pairwise_distances(train_images, metric='cosine')
+
+fig, ax = plt.subplots()
+im = ax.imshow(pair_dist_cosine)
+fig.colorbar(im, ax=ax)
+ax.set_title('RDM cosine of train images')
+plt.show()
+fig.savefig(os.path.join(config['dataset_dir'], 'RDM coscience of train images'))
+
+# %%
+# rdm of train sequences
+train_loader_seq = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader_spin.pth'))
+seq_frames = []
+seq_labels = []
+plotting = []
+for i, (_image, _label) in enumerate(train_loader_seq):
+    seq_frames.append(torch.flatten(torch.squeeze(_image)).numpy())
+    plotting.append(torch.squeeze(_image).numpy())
+    seq_labels.append(_label)
+seq_labels = torch.cat(seq_labels)
+seq_frames = np.vstack(seq_frames)
+
+# sort frames
+seq_sort_label, seq_indices = torch.sort(seq_labels)
+seq_labels = seq_labels[seq_indices]
+seq_frames = seq_frames[seq_indices]
+# %%
+# example sequence
+fig, axs = plt.subplots(1, 5, sharex=True)
+for i in range(5):
+    axs[i].imshow(plotting[i])
+plt.show()
+fig.savefig(os.path.join(config['dataset_dir'], 'example sequence'))
+
+
+# %%
+# rdm of one sequence
+pair_dist_cosine = pairwise_distances(seq_frames[:5], metric='cosine')
+
+fig, ax = plt.subplots()
+im = ax.imshow(pair_dist_cosine)
+fig.colorbar(im, ax=ax)
+ax.set_title('RDM cosine of frames one sequence')
+# plt.show()
+fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one sequence'))
+
+# %%
+# rdm of a class of sequence
+pair_dist_cosine = pairwise_distances(seq_frames[:5*4*10], metric='cosine')
+fig, ax = plt.subplots()
+im = ax.imshow(pair_dist_cosine)
+fig.colorbar(im, ax=ax)
+ax.set_title('RDM cosine of frames one class')
+# plt.show()
+fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one class'))
+
+
+# %%
+# rdm of all classes of sequences
+pair_dist_cosine = pairwise_distances(seq_frames, metric='euclidean')
+fig, ax = plt.subplots()
+im = ax.imshow(pair_dist_cosine)
+fig.colorbar(im, ax=ax)
+ax.set_title('RDM cosine of frames all classes')
+# plt.show()
+fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames all classes'))

@@ -2,17 +2,25 @@ import os
 
 import torch
 import torch.nn as nn
+# %%
+import wandb
 # Device configuration
 import yaml
 from torch.utils import data
 
+wandb.login(key='25f10546ef384a6f1ab9446b42d7513024dea001')
+
+wandb.init(project="DHPC_morph_cnn", entity="lucyzmf")  # , mode='disabled')
+
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
+config = wandb.config
+
 # Hyper parameters
-num_epochs = 100
-num_classes = 10
+config.num_epochs = 100
+config.num_classes = 10
 batch_size = 100
-learning_rate = 0.001
+config.learning_rate = 0.001
 
 CONFIG_PATH = "../scripts/"
 
@@ -95,15 +103,16 @@ class ConvNet(nn.Module):
         return out
 
 
-model = ConvNet(num_classes).to(device)
+model = ConvNet(config.num_classes).to(device)
+wandb.watch(model)
 
 # Loss and optimizer
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
 
 # Train the model
 total_step = len(train_loader)
-for epoch in range(num_epochs):
+for epoch in range(config.num_epochs):
     for i, (images, labels) in enumerate(train_loader):
         images = torch.unsqueeze(images, dim=0).to(device)
         labels = labels.to(device)
@@ -119,7 +128,7 @@ for epoch in range(num_epochs):
 
         if (i + 1) % 100 == 0:
             print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
-                  .format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
+                  .format(epoch + 1, config.num_epochs, i + 1, total_step, loss.item()))
 
 # Test the model
 model.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)

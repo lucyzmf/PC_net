@@ -8,6 +8,7 @@ import seaborn as sns
 import torch.profiler
 import yaml
 from sklearn.manifold import TSNE
+from torch import nn
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
@@ -39,6 +40,7 @@ padding = config['padding_size']
 data_width = 28 + padding * 2
 num_classes = 10
 
+
 # %%
 # load images
 train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
@@ -50,11 +52,13 @@ test_indices = test_set.indices
 
 # %%
 train_images = train_set.dataset.data[train_indices]
+train_images = nn.functional.pad(train_images, (padding, padding, padding, padding))
 train_images = torch.flatten(train_images, start_dim=1).numpy()
 train_labels = train_set.dataset.targets[train_indices].numpy()
 
 # %%
 test_images = test_set.dataset.data[test_indices]
+test_images = nn.functional.pad(test_images, (padding, padding, padding, padding))
 test_images = torch.flatten(test_images, start_dim=1).numpy()
 test_labels = test_set.dataset.targets[test_indices].numpy()
 
@@ -191,6 +195,10 @@ print('avg accuracy over 10 runs for linear classifier on sequence test dataset 
 images_all_spin, labels_all_spin, acc_knn_spin = linear_classifier_kfold(train_seq_spin, train_labels_spin, test_seq_spin, test_labels_spin)
 print('cumulative accuracy over 5 folds for knn classifier on sequence dataset (train and test) %.4f' % acc_knn)
 
+# %%
+# acc of linear classifier trained on frames of sequence and tested on still images
+acc_train_seq, acc_test_still = linear_classifier(train_seq_spin, train_labels_spin, test_images, test_labels)
+print('linear classifier trained on sequence tested on still: train acc %.4f, test acc %.4f' % (acc_train_seq, acc_test_still))
 
 # %%
 #######################

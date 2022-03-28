@@ -196,7 +196,7 @@ if __name__ == '__main__':
                 torch.save(net.state_dict(), trained_model_dir + str(config['morph_type']) + str(net.architecture) +
                            str(net.inf_rates) + 'readout.pth')
 
-            if epoch % 10 == 0:  # evaluation every 10 epochs
+            if (epoch % 10 == 0) or (epoch == epochs-1):  # evaluation every 10 epochs
                 # get error on single frames
                 errors_test = []
                 net.init_states()

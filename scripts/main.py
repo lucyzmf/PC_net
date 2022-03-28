@@ -247,6 +247,10 @@ if __name__ == '__main__':
                 print('epoch: %i: classification performance on representation at the end of each sequence '
                       '(train seq data): %.4f, on test seq data: %.4f' % (epoch, acc_train, acc_test))
 
+                # knn classification on train and test sequence
+                _, _, cum_acc_knn = linear_classifier_kfold(seq_rep_train, seq_label_train, seq_rep_test, seq_label_test)
+                print('epoch: %i: classification performance on representation at the end of each sequence knn %.4f' % (epoch, cum_acc_knn))
+
                 # classification acc on still test data
                 _, acc_still_test = linear_classifier(seq_rep_train, seq_label_train, rep_still_test, rep_still_labels)
                 print('classifcation acc on still test images: %.4f' % acc_still_test)
@@ -255,6 +259,7 @@ if __name__ == '__main__':
                     'test_error': total_errors_test[-1],
                     'linear classification acc on train set seq': acc_train,
                     'linear classification acc on test set seq': acc_test,
+                    'knn_acc': cum_acc_knn,
                     'classification acc on test still img': acc_still_test
                 })
 

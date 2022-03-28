@@ -80,12 +80,12 @@ padding = config['padding_size']
 #                                    num_workers=config['num_workers'], pin_memory=config['pin_mem'])
 
 # MNIST dataset
-train_dataset = torchvision.datasets.MNIST(root='../../data/',
+train_dataset = torchvision.datasets.FashionMNIST(root='../../data/',
                                            train=True,
                                            transform=transforms.ToTensor(),
                                            download=True)
 
-test_dataset = torchvision.datasets.MNIST(root='../../data/',
+test_dataset = torchvision.datasets.FashionMNIST(root='../../data/',
                                           train=False,
                                           transform=transforms.ToTensor())
 

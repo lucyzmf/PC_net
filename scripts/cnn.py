@@ -14,13 +14,13 @@ wandb.init(project="DHPC_morph_cnn", entity="lucyzmf")  # , mode='disabled')
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-config = wandb.config
+wbconfig = wandb.config
 
 # Hyper parameters
-config.num_epochs = 100
-config.num_classes = 10
+wbconfig.num_epochs = 100
+wbconfig.num_classes = 10
 batch_size = 100
-config.learning_rate = 0.001
+wbconfig.learning_rate = 0.001
 
 CONFIG_PATH = "../scripts/"
 
@@ -103,16 +103,16 @@ class ConvNet(nn.Module):
         return out
 
 
-model = ConvNet(config.num_classes).to(device)
+model = ConvNet(wbconfig.num_classes).to(device)
 wandb.watch(model)
 
 # Loss and optimizer
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+optimizer = torch.optim.Adam(model.parameters(), lr=wbconfig.learning_rate)
 
 # Train the model
 total_step = len(train_loader)
-for epoch in range(config.num_epochs):
+for epoch in range(wbconfig.num_epochs):
     for i, (images, labels) in enumerate(train_loader):
         images = torch.unsqueeze(images, dim=0).to(device)
         labels = labels.to(device)
@@ -128,7 +128,7 @@ for epoch in range(config.num_epochs):
 
         if (i + 1) % 100 == 0:
             print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
-                  .format(epoch + 1, config.num_epochs, i + 1, total_step, loss.item()))
+                  .format(epoch + 1, wbconfig.num_epochs, i + 1, total_step, loss.item()))
 
 # Test the model
 model.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
@@ -143,7 +143,7 @@ with torch.no_grad():
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
-    print('Test Accuracy of the model on the 10000 test images: {} %'.format(100 * correct / total))
+    print('Test Accuracy of the model on test images: {} %'.format(100 * correct / total))
 
 # Save the model checkpoint
 torch.save(model.state_dict(), 'model.ckpt')

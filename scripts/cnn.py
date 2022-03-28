@@ -19,7 +19,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 wbconfig = wandb.config
 
 # Hyper parameters
-wbconfig.num_epochs = 1
+wbconfig.num_epochs = 100
 wbconfig.num_classes = 10
 batch_size = 100
 wbconfig.learning_rate = 0.001

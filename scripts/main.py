@@ -188,7 +188,7 @@ if __name__ == '__main__':
                     })
 
                 if (i+1) % frame_per_seq == 0:  # at the end of each sequence
-                    if epoch % 10 == 0 :
+                    if (epoch % 10 == 0) or (epoch == epochs-1):
                         seq_rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
                         seq_label_train.append(label)
                     net.init_states()

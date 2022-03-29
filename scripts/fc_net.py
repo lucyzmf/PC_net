@@ -139,7 +139,7 @@ class FcDHPC(nn.Module):
         for i in range(len(self.states['r_activation'])):
             if i != len(self.architecture) - 1:
                 self.states['error'][i] = torch.zeros(self.architecture[i]).to(self.device)
-            self.states['r_activation'][i] = -2 * torch.ones(self.architecture[i]).to(self.device)
+            self.states['r_activation'][i] = -1 * torch.ones(self.architecture[i]).to(self.device)
             self.states['r_output'][i] = self.layers[i].actFunc(self.states['r_activation'][i])
 
     def forward(self, frame, inference_steps, istrain=True):
@@ -160,7 +160,7 @@ class FcDHPC(nn.Module):
             r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
                                               r_act[-1])
 
-            if i > 0 and i % 25 == 0:
+            if i > 0 and i % 50 == 0:
                 if istrain:
                     self.learn()
 

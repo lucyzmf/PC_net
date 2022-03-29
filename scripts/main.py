@@ -62,10 +62,23 @@ if __name__ == '__main__':
     morph_type = config['morph_type']
     frame_per_seq = config['frame_per_sequence']
     padding = config['padding_size']
+    seq_train = config['seq_train']
 
     # load data
-    train_loader = torch.load(
-        os.path.join(config['dataset_dir'], str(dataset) + 'train_loader_' + str(morph_type) + '.pth'))
+    if seq_train:
+        train_loader = torch.load(
+            os.path.join(config['dataset_dir'], str(dataset) + 'train_loader_' + str(morph_type) + '.pth'))
+    else:
+        train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
+        train_indices = train_set.indices
+        train_img_still = train_set.dataset.data[train_indices]
+        train_img_still = nn.functional.pad(train_img_still, (padding, padding, padding, padding))
+        train_labels_still = train_set.dataset.targets[train_indices]
+        train_still_img_dataset = data.TensorDataset(train_img_still, train_labels_still)
+        train_loader = data.DataLoader(train_still_img_dataset, batch_size=config['batch_size'],
+                                                 num_workers=config['num_workers'], pin_memory=config['pin_mem'], shuffle=True)
+
+
     test_loader = torch.load(
         os.path.join(config['dataset_dir'], str(dataset) + 'test_loader_' + str(morph_type) + '.pth'))
 
@@ -76,7 +89,8 @@ if __name__ == '__main__':
     test_img_still = nn.functional.pad(test_img_still, (padding, padding, padding, padding))
     test_labels_still = test_set.dataset.targets[test_indices]
     still_img_dataset = data.TensorDataset(test_img_still, test_labels_still)
-    still_img_loader = data.DataLoader(still_img_dataset, batch_size=config['batch_size'], num_workers=config['num_workers'], pin_memory=config['pin_mem'])
+    test_still_img_loader = data.DataLoader(still_img_dataset, batch_size=config['batch_size'],
+                                            num_workers=config['num_workers'], pin_memory=config['pin_mem'], shuffle=True)
 
     # %%
     ###########################
@@ -104,6 +118,7 @@ if __name__ == '__main__':
         wbconfig.train_size = config['train_size']
         wbconfig.test_size = config['test_size']
         wbconfig.act_func = config['act_func']
+        wbconfig.seq_train = seq_train
 
         #  network instantiation
         if arch_type == 'FcDHPC':
@@ -118,9 +133,6 @@ if __name__ == '__main__':
         wandb.watch(net)
         print('network instantiated')
 
-        # building memory storage
-        mem = torch.rand([numClass, arch[-1]]).to(device)
-
         # %%
         # values logged during training
         total_errors = []
@@ -130,7 +142,7 @@ if __name__ == '__main__':
         test_acc_history = []  # acc on test set at the end of each epoch
 
         # sample image and label to test reconstruction
-        for test_images, test_labels in test_loader:
+        for test_images, test_labels in test_still_img_loader:
             sample_image = test_images[0]  # Reshape them according to your needs.
             sample_label = test_labels[0]
 
@@ -165,7 +177,7 @@ if __name__ == '__main__':
         for epoch in range(epochs):
             errors = []  # log total error per sample in dataset
             last_layer_act = []  # log avg act of last layer neurons per sample
-            seq_rep_train, seq_label_train = [], []  # log high level representations at the end of each sequence to test classification
+            rep_train, label_train = [], []  # log high level representations at the end of each sequence to test classification
             seq_rep_test, seq_label_test = [], []
 
             for i, (image, label) in enumerate(train_loader):
@@ -187,10 +199,15 @@ if __name__ == '__main__':
                         'layer 0 error activation': wandb.Histogram(net.states['error'][0].detach().cpu())
                     })
 
-                if (i+1) % frame_per_seq == 0:  # at the end of each sequence
+                if seq_train and ((i+1) % frame_per_seq == 0):  # if trained on sequences
                     if (epoch % 10 == 0) or (epoch == epochs-1):
-                        seq_rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
-                        seq_label_train.append(label)
+                        rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
+                        label_train.append(label)
+                    net.init_states()
+                else:  # if trained on still images
+                    if (epoch % 10 == 0) or (epoch == epochs - 1):
+                        rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
+                        label_train.append(label)
                     net.init_states()
 
             # summary data
@@ -209,58 +226,70 @@ if __name__ == '__main__':
                            str(net.inf_rates) + 'readout.pth')
 
             if (epoch % 10 == 0) or (epoch == epochs-1):  # evaluation every 10 epochs
+                # organise reps logged during training
+                rep_train = np.vstack(rep_train)
+                label_train = torch.concat(label_train).numpy()
                 # get error on single frames
                 errors_test = []
                 rep_still_test = []  # log rep generated from still images for classification testing
-                rep_still_labels =[]
+                rep_still_labels = []
                 net.init_states()
-                for i, (_image, _label) in enumerate(test_loader):  # generate high level rep using spin seq test dataset
-                    net(_image, inference_steps, istrain=False)
-                    errors_test.append(net.total_error())
-                    if (i + 1) % frame_per_seq == 0:  # at the end of each sequence
-                        seq_rep_test.append(net.states['r_activation'][-1].detach().cpu().numpy())  # rep recorded at end of each seq
-                        seq_label_test.append(_label)
-                        net.init_states()
 
-                for i, (_image, _label) in enumerate(still_img_loader):  # iterate through still image loader
+                for i, (_image, _label) in enumerate(test_still_img_loader):  # iterate through still image loader to generate reps
                     net.init_states()
                     net(_image, inference_steps, istrain=False)
+                    errors_test.append(net.total_error())
                     rep_still_test.append(net.states['r_activation'][-1].detach().cpu().numpy())
                     rep_still_labels.append(_label)
+                # organise arrays logging reps for test still imgs
+                rep_still_test = np.vstack(rep_still_test)  # representations
+                rep_still_labels = torch.concat(rep_still_labels).numpy()  # labels
 
+                if seq_train:
+                    for i, (_image, _label) in enumerate(test_loader):  # generate high level rep using spin seq test dataset
+                        net(_image, inference_steps, istrain=False)
+                        if (i + 1) % frame_per_seq == 0:  # at the end of each sequence
+                            seq_rep_test.append(net.states['r_activation'][-1].detach().cpu().numpy())  # rep recorded at end of each seq
+                            seq_label_test.append(_label)
+                            net.init_states()
+                    # convert arrays
+                    seq_rep_test = np.vstack(seq_rep_test)
+                    seq_label_test = torch.concat(seq_label_test).numpy()
+
+                    # use linear classifier to test train and test sequence dataset classification performance
+                    # classification acc on sequence representations from train and test spin data
+                    acc_train, acc_test = linear_classifier(rep_train, label_train, seq_rep_test, seq_label_test)
+                    print('epoch: %i: classification performance on representation at the end of each sequence '
+                          '(train seq data): %.4f, on test seq data: %.4f' % (epoch, acc_train, acc_test))
+
+                    # knn classification on train and test sequence
+                    _, _, cum_acc_knn = linear_classifier_kfold(rep_train, label_train, seq_rep_test, seq_label_test)
+                    print('epoch: %i: classification performance on representation at the end of each sequence knn %.4f'
+                          % (epoch, cum_acc_knn))
+
+                    wandb.log({
+                        'linear classification acc on train set seq': acc_train,
+                        'linear classification acc on test set seq': acc_test,
+                        'knn_acc on seq': cum_acc_knn
+                    })
 
                 total_errors_test.append(np.mean(errors_test))
                 print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' %
                       (epoch, total_errors[-1], last_layer_act_log[-1]))
                 print('total error on test set: %.4f' % (total_errors_test[-1]))
 
-                # use linear classifier to test train and test dataset classification performance
-                seq_rep_train = np.vstack(seq_rep_train)
-                seq_label_train = torch.concat(seq_label_train).numpy()
-                seq_rep_test = np.vstack(seq_rep_test)
-                seq_label_test = torch.concat(seq_label_test).numpy()
-                rep_still_test = np.vstack(rep_still_test)  # representations
-                rep_still_labels = torch.concat(rep_still_labels).numpy()  # labels
 
-                # classification acc on sequence representations from train and test spin data
-                acc_train, acc_test = linear_classifier(seq_rep_train, seq_label_train, seq_rep_test, seq_label_test)
-                print('epoch: %i: classification performance on representation at the end of each sequence '
-                      '(train seq data): %.4f, on test seq data: %.4f' % (epoch, acc_train, acc_test))
-
-                # knn classification on train and test sequence
-                _, _, cum_acc_knn = linear_classifier_kfold(seq_rep_train, seq_label_train, seq_rep_test, seq_label_test)
-                print('epoch: %i: classification performance on representation at the end of each sequence knn %.4f' % (epoch, cum_acc_knn))
-
-                # classification acc on still test data
-                _, acc_still_test = linear_classifier(seq_rep_train, seq_label_train, rep_still_test, rep_still_labels)
+                # classification acc on still train reps and still images
+                _, acc_still_test = linear_classifier(rep_train, label_train, rep_still_test, rep_still_labels)
                 print('classifcation acc on still test images: %.4f' % acc_still_test)
 
+                _, acc_still_test_knn = linear_classifier_kfold(rep_train, label_train, rep_still_test, rep_still_labels)
+                print('classifcation acc on still test images (knn): %.4f' % acc_still_test_knn)
+
                 wandb.log({
-                    'test_error': total_errors_test[-1],
-                    'linear classification acc on train set seq': acc_train,
-                    'linear classification acc on test set seq': acc_test,
-                    'knn_acc': cum_acc_knn,
-                    'classification acc on test still img': acc_still_test
+                    'test_error on still images': total_errors_test[-1],
+                    'classification acc on test still img': acc_still_test,
+                    'classifcation acc on still test images (knn)': acc_still_test_knn
                 })
 
                 # sample reconstruction
@@ -294,7 +323,10 @@ if __name__ == '__main__':
         # %%
         _, _, fig_train = generate_rdm(net, train_loader, inference_steps * 5)
         wandb.log({'rdm train data': wandb.Image(fig_train)})
-        _, _, fig_test = generate_rdm(net, test_loader, inference_steps * 5)
-        wandb.log({'rdm test data': wandb.Image(fig_test)})
+        if seq_train:
+            _, _, fig_test = generate_rdm(net, test_loader, inference_steps * 5)
+            wandb.log({'rdm seq test data': wandb.Image(fig_test)})
+        _, _, fig_test = generate_rdm(net, test_still_img_loader, inference_steps * 5)
+        wandb.log({'rdm still image test data': wandb.Image(fig_test)})
 
 

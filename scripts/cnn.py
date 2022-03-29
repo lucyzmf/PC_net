@@ -68,7 +68,7 @@ test_loader = torch.load(
     os.path.join(config['dataset_dir'], str(dataset) + 'test_loader_' + str(morph_type) + '.pth'))
 
 # load test still images
-train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
+train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
 train_indices = train_set.indices
 train_img_still = train_set.dataset.data[train_indices]
 train_img_still = nn.functional.pad(train_img_still, (padding, padding, padding, padding))

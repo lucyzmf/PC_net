@@ -67,7 +67,7 @@ test_labels = test_set.dataset.targets[test_indices].numpy()
 # %%
 # acc of linear classifier on images
 images_all, labels_all, acc_knn = linear_classifier_kfold(train_images, train_labels, test_images, test_labels)
-print('cumulative accuracy over 5 folds for knn classifier %.2f' % acc_knn)
+print('cumulative accuracy over 5 folds for knn classifier on train & tst still images %.2f' % acc_knn)
 
 
 # %%

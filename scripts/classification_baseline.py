@@ -185,6 +185,17 @@ test_seq_spin = np.vstack(test_seq_spin)
 test_labels_spin = torch.concat(test_labels_spin).numpy()
 
 # %%
+# shuffle frames in sequence dataset
+idx = np.arange(len(train_seq_spin))
+idx = np.random.permutation(idx)
+train_seq_spin = train_seq_spin[idx]
+train_labels_spin = train_labels_spin[idx]
+
+idx = np.arange(len(test_seq_spin))
+idx = np.random.permutation(idx)
+test_seq_spin = test_seq_spin[idx]
+test_labels_spin = test_labels_spin[idx]
+
 cum_acc_train_spin, cum_acc_test_spin = linear_classifier(train_seq_spin, train_labels_spin, test_seq_spin, test_labels_spin)
 print('avg accuracy over 10 runs for linear classifier on sequence train dataset %.4f' % cum_acc_train_spin)
 print('avg accuracy over 10 runs for linear classifier on sequence test dataset %.4f' % cum_acc_test_spin)
@@ -205,18 +216,24 @@ print('linear classifier trained on sequence tested on still: train acc %.4f, te
 # visualisation of sequence statistics
 #######################
 
-# rdm of train images
+# rdm of all images
 # sort labels first
 sorted_label, indices = torch.sort(torch.tensor(train_labels))
 train_labels = train_labels[indices]
 train_images = train_images[indices]
 
-pair_dist_cosine = pairwise_distances(train_images, metric='cosine')
+sorted_label, indices = torch.sort(torch.tensor(test_labels))
+test_labels = test_labels[indices]
+test_images = test_images[indices]
+
+images = np.concatenate((train_images, test_images))
+
+pair_dist_cosine = pairwise_distances(images, metric='cosine')
 
 fig, ax = plt.subplots()
 im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)
-ax.set_title('RDM cosine of train images')
+ax.set_title('RDM cosine of train and test images (sorted by class within each dataset)')
 plt.show()
 fig.savefig(os.path.join(config['dataset_dir'], 'RDM coscience of train images'))
 
@@ -243,7 +260,7 @@ fig, axs = plt.subplots(1, 5, sharex=True)
 for i in range(5):
     axs[i].imshow(plotting[i])
 plt.show()
-fig.savefig(os.path.join(config['dataset_dir'], 'example sequence'))
+fig.savefig(os.path.join(config['dataset_dir'], 'example sequence in training set'))
 
 
 # %%
@@ -253,9 +270,9 @@ pair_dist_cosine = pairwise_distances(seq_frames[:5], metric='cosine')
 fig, ax = plt.subplots()
 im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)
-ax.set_title('RDM cosine of frames one sequence')
+ax.set_title('RDM cosine of frames one sequence in training set')
 # plt.show()
-fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one sequence'))
+fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one sequence in training set'))
 
 # %%
 # rdm of a class of sequence
@@ -263,9 +280,9 @@ pair_dist_cosine = pairwise_distances(seq_frames[:5*4*10], metric='cosine')
 fig, ax = plt.subplots()
 im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)
-ax.set_title('RDM cosine of frames one class')
+ax.set_title('RDM cosine of frames one class in training set')
 # plt.show()
-fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one class'))
+fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one class in training set'))
 
 
 # %%
@@ -274,6 +291,6 @@ pair_dist_cosine = pairwise_distances(seq_frames, metric='euclidean')
 fig, ax = plt.subplots()
 im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)
-ax.set_title('RDM cosine of frames all classes')
+ax.set_title('RDM cosine of frames all classes in training set')
 # plt.show()
-fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames all classes'))
+fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames all classes in training set'))

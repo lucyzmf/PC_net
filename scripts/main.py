@@ -171,10 +171,9 @@ if __name__ == '__main__':
             # profiler step boundary
             p.step()
 
-        net.init_states()
-
         # finish profiling of one image, start training
         for epoch in range(epochs):
+            net.init_states()
             errors = []  # log total error per sample in dataset
             last_layer_act = []  # log avg act of last layer neurons per sample
             rep_train, label_train = [], []  # log high level representations at the end of each sequence to test classification
@@ -186,7 +185,7 @@ if __name__ == '__main__':
                 net.learn()
                 errors.append(net.total_error())
 
-                if i % 50 == 0:  # log every 50 steps
+                if (i+1) % 5 == 0:  # log at the end of each sequence
                     last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
                     wandb.log({
                         'last layer activation distribution': wandb.Histogram(
@@ -281,7 +280,7 @@ if __name__ == '__main__':
                 print('total error on test set: %.4f' % (total_errors_test[-1]))
 
 
-                # classification acc on still train reps and still images
+                # classification acc on still train reps and test still images
                 _, acc_still_test = linear_classifier(rep_train, label_train, rep_still_test, rep_still_labels)
                 print('classifcation acc on still test images: %.4f' % acc_still_test)
 

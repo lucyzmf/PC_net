@@ -246,6 +246,7 @@ if __name__ == '__main__':
                 rep_still_labels = torch.concat(rep_still_labels).numpy()  # labels
 
                 if seq_train:
+                    net.init_states()
                     for i, (_image, _label) in enumerate(test_loader):  # generate high level rep using spin seq test dataset
                         net(_image, inference_steps, istrain=False)
                         if (i + 1) % frame_per_seq == 0:  # at the end of each sequence

@@ -283,7 +283,7 @@ if __name__ == '__main__':
                 _, acc_still_test = linear_classifier(rep_train, label_train, rep_still_test, rep_still_labels)
                 print('classifcation acc on still test images: %.4f' % acc_still_test)
 
-                _, acc_still_test_knn = linear_classifier_kfold(rep_train, label_train, rep_still_test, rep_still_labels)
+                _, _, acc_still_test_knn = linear_classifier_kfold(rep_train, label_train, rep_still_test, rep_still_labels)
                 print('classifcation acc on still test images (knn): %.4f' % acc_still_test_knn)
 
                 wandb.log({

@@ -42,7 +42,7 @@ class FCLayer(nn.Module):
         nn.init.normal_(self.weights, 0, 0.5)  # normal distribution
         # nn.init.constant_(self.weights, 0.5)  # constant distribution
         self.weights = torch.clamp(self.weights, min=0)  # weights clamped to above 0
-        self.weights = self.weights / self.layer_size  # normalise weights given next layer size
+        self.weights = self.weights / self.layer_size  # normalise weights given this layer size
 
     # def reset_state(self):
     # reinitialise activation and output values

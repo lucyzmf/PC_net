@@ -3,8 +3,6 @@ import os
 import torch
 import torch.nn as nn
 # %%
-import torchvision
-import torchvision.transforms as transforms
 import wandb
 # Device configuration
 import yaml
@@ -64,39 +62,48 @@ frame_per_seq = config['frame_per_sequence']
 padding = config['padding_size']
 
 # load data
-# train_loader = torch.load(
-#     os.path.join(config['dataset_dir'], str(dataset) + 'train_loader_' + str(morph_type) + '.pth'))
-# test_loader = torch.load(
-#     os.path.join(config['dataset_dir'], str(dataset) + 'test_loader_' + str(morph_type) + '.pth'))
-#
-# # load test still images
-# test_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
-# test_indices = test_set.indices
-# test_img_still = test_set.dataset.data[test_indices]
-# test_img_still = nn.functional.pad(test_img_still, (padding, padding, padding, padding))
-# test_labels_still = test_set.dataset.targets[test_indices]
-# still_img_dataset = data.TensorDataset(test_img_still, test_labels_still)
-# still_img_loader = data.DataLoader(still_img_dataset, batch_size=config['batch_size'],
-#                                    num_workers=config['num_workers'], pin_memory=config['pin_mem'])
+train_loader = torch.load(
+    os.path.join(config['dataset_dir'], str(dataset) + 'train_loader_' + str(morph_type) + '.pth'))
+test_loader = torch.load(
+    os.path.join(config['dataset_dir'], str(dataset) + 'test_loader_' + str(morph_type) + '.pth'))
+
+# load test still images
+train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
+train_indices = train_set.indices
+train_img_still = train_set.dataset.data[train_indices]
+train_img_still = nn.functional.pad(train_img_still, (padding, padding, padding, padding))
+train_labels_still = train_set.dataset.targets[train_indices]
+train_still_img_dataset = data.TensorDataset(train_img_still, train_labels_still)
+train_still_img_loader = data.DataLoader(train_still_img_dataset, batch_size=config['batch_size'],
+                                   num_workers=config['num_workers'], pin_memory=config['pin_mem'])
+
+test_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
+test_indices = test_set.indices
+test_img_still = test_set.dataset.data[test_indices]
+test_img_still = nn.functional.pad(test_img_still, (padding, padding, padding, padding))
+test_labels_still = test_set.dataset.targets[test_indices]
+still_img_dataset = data.TensorDataset(test_img_still, test_labels_still)
+test_still_img_loader = data.DataLoader(still_img_dataset, batch_size=config['batch_size'],
+                                   num_workers=config['num_workers'], pin_memory=config['pin_mem'])
 
 # MNIST dataset
-train_dataset = torchvision.datasets.FashionMNIST(root='../../data/',
-                                           train=True,
-                                           transform=transforms.ToTensor(),
-                                           download=True)
-
-test_dataset = torchvision.datasets.FashionMNIST(root='../../data/',
-                                          train=False,
-                                          transform=transforms.ToTensor())
-
-# Data loader
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                           batch_size=batch_size,
-                                           shuffle=True)
-
-test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                          batch_size=batch_size,
-                                          shuffle=False)
+# train_dataset = torchvision.datasets.FashionMNIST(root='../../data/',
+#                                            train=True,
+#                                            transform=transforms.ToTensor(),
+#                                            download=True)
+#
+# test_dataset = torchvision.datasets.FashionMNIST(root='../../data/',
+#                                           train=False,
+#                                           transform=transforms.ToTensor())
+#
+# # Data loader
+# train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
+#                                            batch_size=batch_size,
+#                                            shuffle=True)
+#
+# test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
+#                                           batch_size=batch_size,
+#                                           shuffle=False)
 
 # %%
 
@@ -162,7 +169,7 @@ for epoch in range(wbconfig.num_epochs):
         with torch.no_grad():
             correct = 0
             total = 0
-            for images, labels in test_loader:
+            for images, labels in test_still_img_loader:
                 # images = torch.unsqueeze(images.float(), dim=1).to(device)
                 images = images.to(device)
                 labels = labels.to(device)

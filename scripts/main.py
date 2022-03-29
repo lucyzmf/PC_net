@@ -204,7 +204,8 @@ if __name__ == '__main__':
                         rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
                         label_train.append(label)
                     net.init_states()
-                else:  # if trained on still images
+
+                if not seq_train:  # if trained on still images
                     if (epoch % 10 == 0) or (epoch == epochs - 1):
                         rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
                         label_train.append(label)

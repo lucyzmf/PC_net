@@ -257,7 +257,7 @@ if __name__ == '__main__':
                 rep_still_labels = torch.concat(rep_still_labels).numpy()  # labels
 
                 # assess clustering
-                _, within_sample_acc = within_sample_classification_stratified(rep_train, label_train)
+                within_sample_acc = within_sample_classification_stratified(rep_train, label_train)
                 print('clustering: linear regression on high level reps from train set (stratified kfold) %.4f'
                       % within_sample_acc)
                 wandb.log({'clustering: linear regression on high level reps from train set (stratified kfold)': within_sample_acc})

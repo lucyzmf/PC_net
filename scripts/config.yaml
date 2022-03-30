@@ -12,11 +12,11 @@ padding_size: 5
 # network hyperparameters
 epochs: 40
 infsteps: 100
-infrates: [.01, .01, .01]
+infrates: [.01, .01, .01, .01]
 network_size: [1444, 100]
 learning_rate: .001
 act_func: sigmoid  # relu, sigmoid
-per_seq_repeat: 1
+per_seq_repeat: 2
 
 # network architecture: FcDHPC,RfDHPC_cm
 architecture: FcDHPC
@@ -24,7 +24,7 @@ rf_sizes: [5, 9, 15]
 
 # used to generate morphing dataset
 frame_per_sequence: 5
-seq_train: True  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
+seq_train: False  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
 morph_type: spin
 reg_strength: 1
 reg_type: l2

@@ -97,10 +97,7 @@ train_x, train_y, train_log = generate_spin_sequence(train_dataset, rotation_axi
 
 # %%
 # shuffle sequence, targets, and log
-train_x = shuffle(train_x)
-train_y = shuffle(train_y)
-train_log['rotation_axis'] = shuffle(train_log['rotation_axis'])
-train_log['direction'] = shuffle(train_log['direction'])
+train_x, train_y, train_log['rotation_axis'], train_log['direction'] = shuffle([train_x, train_y, train_log['rotation_axis'], train_log['direction']])
 
 # %%
 # collapse first two dimensions of train_x, add dimension to train_y
@@ -127,10 +124,7 @@ test_x, test_y, test_log = generate_spin_sequence(test_dataset, rotation_axis, d
                                                   frames=frames_per_sequence, w=data_width, focal=f)
 
 # shuffle sequence, targets, and log
-test_x = shuffle(test_x)
-test_y = shuffle(test_y)
-test_log['rotation_axis'] = shuffle(test_log['rotation_axis'])
-test_log['direction'] = shuffle(test_log['direction'])
+test_x, test_y, test_log['rotation_axis'], test_log['direction'] = shuffle([test_x, test_y, test_log['rotation_axis'], test_log['direction']])
 
 # %%
 # collapse first two dimensions of train_x, add dimension to train_y

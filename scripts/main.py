@@ -25,6 +25,7 @@ now = datetime.datetime.now()
 # load config
 CONFIG_PATH = "../scripts/"
 
+test_name = 'morph_test_1'
 
 def load_config(config_name):
     with open(os.path.join(CONFIG_PATH, config_name)) as file:
@@ -154,8 +155,8 @@ if __name__ == '__main__':
 
         print('start training')
         # prepare profiler
-        profile_dir = "../results/" + str(now) + '/trace/'
-        trained_model_dir = "../results/" + str(now) + '/trained_model/'
+        profile_dir = "../results/" + test_name + str(now) + '/trace/'
+        trained_model_dir = "../results/" + test_name + str(now) + '/trained_model/'
         os.makedirs(trained_model_dir)
         with torch.profiler.profile(
                 activities=[
@@ -186,8 +187,7 @@ if __name__ == '__main__':
             seq_rep_test, seq_label_test = [], []
 
             for i, (image, label) in enumerate(train_loader):
-                for j in range(per_seq_repeat):
-                    net(image, inference_steps, istrain=True)
+                net(image, inference_steps, istrain=True)
                 net.learn()
                 errors.append(net.total_error())
 

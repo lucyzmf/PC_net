@@ -149,8 +149,9 @@ def generate_spin_sequence(dataset, rotation_axis, direction, degrees, frames, w
 
 
 # %%
-def shuffle(data):  # take tensor datasets and targets and returns shuffled datasets and targets
-    idx = torch.randperm(len(data))
-    data = data[idx]
+def shuffle(data_list):  # take tensor datasets and targets and returns shuffled datasets and targets
+    idx = torch.randperm(len(data_list[0]))
+    for i in range(len(data_list)):
+        data_list[i] = data_list[i][idx]
 
-    return data
+    return data_list

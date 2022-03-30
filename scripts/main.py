@@ -65,6 +65,7 @@ if __name__ == '__main__':
     seq_train = config['seq_train']
     reg_strength = config['reg_strength']
     reg_type = config['reg_type']
+    infstep_before_update = config['infstep_before_update']
 
     # load data
     if seq_train:
@@ -123,6 +124,7 @@ if __name__ == '__main__':
         wbconfig.seq_train = seq_train
         wbconfig.reg_strength = reg_strength
         wbconfig.reg_type = reg_type
+        wbconfig.update_per_frame = inference_steps / infstep_before_update
 
         #  network instantiation
         if arch_type == 'FcDHPC':
@@ -224,11 +226,6 @@ if __name__ == '__main__':
                 'avg last layer act': last_layer_act_log[-1]
             })
 
-            if epoch == epochs - 1:
-                print('end training, saving trained model')
-                torch.save(net.state_dict(), trained_model_dir + str(config['morph_type']) + str(net.architecture) +
-                           str(net.inf_rates) + 'readout.pth')
-
             if (epoch % 10 == 0) or (epoch == epochs-1):  # evaluation every 10 epochs
                 # organise reps logged during training
                 rep_train = np.vstack(rep_train)
@@ -307,6 +304,13 @@ if __name__ == '__main__':
                 # sample reconstruction
                 recon_error, fig = net.reconstruct(sample_image, sample_label, inference_steps)
                 wandb.log({'reconstructed image': wandb.Image(fig)})
+
+                # save trained models
+                if epoch == epochs - 1:
+                    print('end training, saving trained model')
+                    torch.save(net.state_dict(), trained_model_dir + str(config['morph_type']) + str(net.architecture) +
+                               str(net.inf_rates) + str(seq_train) + str(reg_type) + '_' + str(reg_strength) +
+                               str(wbconfig.update_per_frame) + 'updates_per_frame' + 'readout.pth')
 
 
         # %%

@@ -105,7 +105,7 @@ if __name__ == '__main__':
         dataWidth = 28 + 2*config['padding_size']
 
         # Hyperparameters for training logged with wandb
-        wandb.init(project="DHPC_morph_test1", entity="lucyzmf")  # , mode='disabled')
+        wandb.init(project="DHPC_morph", entity="lucyzmf")  # , mode='disabled')
 
         wbconfig = wandb.config
         wbconfig.infstep = inference_steps

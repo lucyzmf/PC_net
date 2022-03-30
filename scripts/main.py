@@ -249,6 +249,7 @@ if __name__ == '__main__':
                       (epoch, total_errors[-1], last_layer_act_log[-1]))
                 print('total error on test set: %.4f' % (total_errors_test[-1]))
                 wandb.log({
+                    'epoch': epoch,
                     'test_error on still images': total_errors_test[-1]
                 })
 
@@ -260,7 +261,10 @@ if __name__ == '__main__':
                 within_sample_acc = within_sample_classification_stratified(rep_train, label_train)
                 print('clustering: linear regression on high level reps from train set (stratified kfold) %.4f'
                       % within_sample_acc)
-                wandb.log({'clustering: linear regression on high level reps from train set (stratified kfold)': within_sample_acc})
+                wandb.log({
+                    'epoch': epoch,
+                    'clustering: linear regression on high level reps from train set (stratified kfold)': within_sample_acc
+                })
 
                 # assess generalisation that applies to both conditions
                 # classification acc on still train reps and test still images
@@ -270,6 +274,7 @@ if __name__ == '__main__':
                 _, acc_still_test_knn = knn_classifier(rep_train, label_train, rep_still_test, rep_still_labels)
                 print('generalisation: knn on still test images: %.4f' % acc_still_test_knn)
                 wandb.log({
+                    'epoch': epoch,
                     'generalisation to still img (linear regression)': acc_still_test_reg,
                     'generalisation to still img (knn)': acc_still_test_knn
                 })
@@ -297,13 +302,17 @@ if __name__ == '__main__':
                           % (epoch, cum_acc_knn))
 
                     wandb.log({
+                        'epoch': epoch,
                         'generalisation, seq rep to seq rep linear regression': acc_test,
                         'generalisation, seq rep to seq rep knn': cum_acc_knn
                     })
 
                 # sample reconstruction
                 recon_error, fig = net.reconstruct(sample_image, sample_label, inference_steps)
-                wandb.log({'reconstructed image': wandb.Image(fig)})
+                wandb.log({
+                    'epoch': epoch,
+                    'reconstructed image': wandb.Image(fig)
+                })
 
                 # save trained models
                 if epoch == epochs - 1:

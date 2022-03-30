@@ -241,9 +241,37 @@ if __name__ == '__main__':
                     errors_test.append(net.total_error())
                     rep_still_test.append(net.states['r_activation'][-1].detach().cpu().numpy())
                     rep_still_labels.append(_label)
+
+                # log errors
+                total_errors_test.append(np.mean(errors_test))
+                print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' %
+                      (epoch, total_errors[-1], last_layer_act_log[-1]))
+                print('total error on test set: %.4f' % (total_errors_test[-1]))
+                wandb.log({
+                    'test_error on still images': total_errors_test[-1]
+                })
+
                 # organise arrays logging reps for test still imgs
                 rep_still_test = np.vstack(rep_still_test)  # representations
                 rep_still_labels = torch.concat(rep_still_labels).numpy()  # labels
+
+                # assess clustering
+                _, within_sample_acc = within_sample_classification_stratified(rep_train, label_train)
+                print('clustering: linear regression on high level reps from train set (stratified kfold) %.4f'
+                      % within_sample_acc)
+                wandb.log({'clustering: linear regression on high level reps from train set (stratified kfold)': within_sample_acc})
+
+                # assess generalisation that applies to both conditions
+                # classification acc on still train reps and test still images
+                _, acc_still_test_reg = linear_regression(rep_train, label_train, rep_still_test, rep_still_labels)
+                print('generalisation: linear regression on still test images: %.4f' % acc_still_test_reg)
+
+                _, acc_still_test_knn = knn_classifier(rep_train, label_train, rep_still_test, rep_still_labels)
+                print('generalisation: knn on still test images: %.4f' % acc_still_test_knn)
+                wandb.log({
+                    'generalisation to still img (linear regression)': acc_still_test_reg,
+                    'generalisation to still img (knn)': acc_still_test_knn
+                })
 
                 if seq_train:
                     net.init_states()
@@ -257,41 +285,20 @@ if __name__ == '__main__':
                     seq_rep_test = np.vstack(seq_rep_test)
                     seq_label_test = torch.concat(seq_label_test).numpy()
 
-                    # use linear classifier to test train and test sequence dataset classification performance
-                    # classification acc on sequence representations from train and test spin data
-                    acc_train, acc_test = linear_classifier(rep_train, label_train, seq_rep_test, seq_label_test)
-                    print('epoch: %i: classification performance on representation at the end of each sequence '
-                          '(train seq data): %.4f, on test seq data: %.4f' % (epoch, acc_train, acc_test))
+                    # assess generalisation using all seq reps , use two types of classifiers
+                    # linear regression
+                    acc_train, acc_test = linear_regression(rep_train, label_train, seq_rep_test, seq_label_test)
+                    print('epoch: %i: generalisation, seq rep to seq rep linear regression test acc %.4f' % (epoch, acc_test))
 
                     # knn classification on train and test sequence
-                    _, _, cum_acc_knn = linear_classifier_kfold(rep_train, label_train, seq_rep_test, seq_label_test)
-                    print('epoch: %i: classification performance on representation at the end of each sequence knn %.4f'
+                    _, cum_acc_knn = knn_classifier(rep_train, label_train, seq_rep_test, seq_label_test)
+                    print('epoch: %i: generalisation, seq rep to seq rep knn test acc %.4f'
                           % (epoch, cum_acc_knn))
 
                     wandb.log({
-                        'linear classification acc on train set seq': acc_train,
-                        'linear classification acc on test set seq': acc_test,
-                        'knn_acc on seq': cum_acc_knn
+                        'generalisation, seq rep to seq rep linear regression': acc_test,
+                        'generalisation, seq rep to seq rep knn': cum_acc_knn
                     })
-
-                total_errors_test.append(np.mean(errors_test))
-                print('epoch: %i, total error on train set: %.4f, avg last layer activation: %.4f' %
-                      (epoch, total_errors[-1], last_layer_act_log[-1]))
-                print('total error on test set: %.4f' % (total_errors_test[-1]))
-
-
-                # classification acc on still train reps and test still images
-                _, acc_still_test = linear_classifier(rep_train, label_train, rep_still_test, rep_still_labels)
-                print('classifcation acc on still test images: %.4f' % acc_still_test)
-
-                _, _, acc_still_test_knn = linear_classifier_kfold(rep_train, label_train, rep_still_test, rep_still_labels)
-                print('classifcation acc on still test images (knn): %.4f' % acc_still_test_knn)
-
-                wandb.log({
-                    'test_error on still images': total_errors_test[-1],
-                    'classification acc on test still img': acc_still_test,
-                    'classifcation acc on still test images (knn)': acc_still_test_knn
-                })
 
                 # sample reconstruction
                 recon_error, fig = net.reconstruct(sample_image, sample_label, 100)

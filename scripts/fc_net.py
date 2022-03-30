@@ -2,10 +2,28 @@
 ###########################
 #  layer class
 ###########################
+import os
+
 import numpy as np
 import torch
+import yaml
 from matplotlib import pyplot as plt
 from torch import nn
+
+CONFIG_PATH = "../scripts/"
+
+
+# Function to load yaml configuration file
+def load_config(config_name):
+    with open(os.path.join(CONFIG_PATH, config_name)) as file:
+        config = yaml.safe_load(file)
+    return config
+
+config = load_config("config.yaml")
+
+reg_strength = config['reg_strength']
+reg_type = config['reg_type']
+infstep_before_update = config['infstep_before_update']
 
 
 #  sigmoid activation function
@@ -13,6 +31,7 @@ def sigmoid(inputs):
     inputs = inputs - 3
     m = nn.Sigmoid()
     return m(inputs)
+
 
 def relu(inputs):
     m = nn.ReLU()
@@ -59,14 +78,17 @@ class FCLayer(nn.Module):
         r_out = self.actFunc(r_act)  # Apply the activation function to get neuronal output
         return e_act, r_act, r_out
 
-    def w_update(self, e_act, nextlayer_output):
-        # l1 regularisation
-        # l1_reg = -torch.sign(torch.clone(self.weights))
-        # l1_reg = l1_reg * .001
-        # l1_reg = l1_reg / self.layer_size
-        l1_reg = 0
+    def w_update(self, e_act, nextlayer_output, reg_constant=reg_strength, r_type=reg_type):
+        if r_type == 'l1':
+            reg_matrix = -torch.sign(torch.clone(self.weights))
+            reg_matrix = reg_constant * reg_matrix
+        elif r_type == 'l2':
+            reg_matrix = -torch.sign(torch.clone(self.weights))
+            reg_matrix = reg_constant * reg_matrix * self.weights
+        else:
+            reg_matrix = 0
         # Learning step
-        delta = self.learn_rate * (torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1)) + l1_reg)
+        delta = self.learn_rate * (torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1)) + reg_matrix)
         self.weights = nn.Parameter(torch.clamp(self.weights + delta, min=0))  # Keep only positive weights
         # self.weights = nn.Parameter(self.weights + delta)  # keep both positive and negative weights
 
@@ -142,7 +164,7 @@ class FcDHPC(nn.Module):
             self.states['r_activation'][i] = -2 * torch.ones(self.architecture[i]).to(self.device)
             self.states['r_output'][i] = self.layers[i].actFunc(self.states['r_activation'][i])
 
-    def forward(self, frame, inference_steps, istrain=True):
+    def forward(self, frame, inference_steps, istrain=True, inf_before_learn=infstep_before_update):
         # frame is input to the lowest layer, inference steps
         e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
         layers = self.layers
@@ -159,10 +181,10 @@ class FcDHPC(nn.Module):
             # update states of last layer
             r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
                                               r_act[-1])
-            #
-            # if i > 0 and i % 50 == 0:
-            #     if istrain:
-            #         self.learn()
+
+            if istrain:
+                if i > 0 and i % inf_before_learn == 0:
+                    self.learn()
 
     def learn(self):
         # iterate through all non last layers to update weights

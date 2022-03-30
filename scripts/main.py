@@ -63,6 +63,8 @@ if __name__ == '__main__':
     frame_per_seq = config['frame_per_sequence']
     padding = config['padding_size']
     seq_train = config['seq_train']
+    reg_strength = config['reg_strength']
+    reg_type = config['reg_type']
 
     # load data
     if seq_train:
@@ -102,7 +104,7 @@ if __name__ == '__main__':
         dataWidth = 28 + 2*config['padding_size']
 
         # Hyperparameters for training logged with wandb
-        wandb.init(project="DHPC_morph", entity="lucyzmf")  # , mode='disabled')
+        wandb.init(project="DHPC_morph_test1", entity="lucyzmf")  # , mode='disabled')
 
         wbconfig = wandb.config
         wbconfig.infstep = inference_steps
@@ -119,6 +121,8 @@ if __name__ == '__main__':
         wbconfig.test_size = config['test_size']
         wbconfig.act_func = config['act_func']
         wbconfig.seq_train = seq_train
+        wbconfig.reg_strength = reg_strength
+        wbconfig.reg_type = reg_type
 
         #  network instantiation
         if arch_type == 'FcDHPC':
@@ -301,32 +305,9 @@ if __name__ == '__main__':
                     })
 
                 # sample reconstruction
-                recon_error, fig = net.reconstruct(sample_image, sample_label, 100)
+                recon_error, fig = net.reconstruct(sample_image, sample_label, inference_steps)
                 wandb.log({'reconstructed image': wandb.Image(fig)})
 
-            # if (epoch == 0) or (epoch == epochs/2) or (epoch == epochs - 1):
-            #     # train classifier using training data
-            #     train_acc = train_classifier(net, classifier, train_loader, 1)
-            #     print(train_acc)
-            #
-            #     # test classification acc at the end of each epoch
-            #     test_acc = test_classifier(net, classifier, test_loader)  # test classifier on test set (unseen data)
-            #     train_acc_history.append(train_acc)
-            #     test_acc_history.append(test_acc)
-            #
-            #     print('epoch: ', epoch, '. classifier training acc: ', train_acc, '. classifier test acc: ', test_acc)
-            #     wandb.log({
-            #         'classifier train acc': train_acc,
-            #         'classifier test acc': test_acc
-            #     })
-
-        # fig, axs = plt.subplots(1, 2, figsize=(10, 4))
-        # axs[0].plot(total_errors)
-        # axs[0].set_title('Total Errors on training set')
-        # axs[1].plot(total_errors_test)
-        # axs[1].set_title('Total Errors on test set')
-        # plt.tight_layout()
-        # plt.show()
 
         # %%
         _, _, fig_train = generate_rdm(net, train_loader, inference_steps * 5)

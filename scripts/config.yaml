@@ -26,6 +26,6 @@ rf_sizes: [5, 9, 15]
 frame_per_sequence: 5
 seq_train: True  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
 morph_type: spin
-reg_strength: .01
+reg_strength: .1
 reg_type: l1
 infstep_before_update: 50

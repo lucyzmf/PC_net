@@ -58,7 +58,8 @@ def test_frame(model, test_data, inference_steps):
     plt.show()
 
 
-def generate_rdm(model, data_loader, inf_steps):  # generate rdm to inspect learned high level representation with either train or test data
+def generate_rdm(model, data_loader,
+                 inf_steps):  # generate rdm to inspect learned high level representation with either train or test data
     # test sequence include all frames of tested sequences
     representation = []  # array containing representation from highest layer
     labels = []
@@ -90,46 +91,27 @@ def high_level_rep(model, image, inference_steps):
 
 
 # %%
-# linear classifier fitted on all samples and tested with stratified kfold knn
-def linear_classifier_kfold(train_images, train_labels, test_images, test_labels):
-    rep_list = np.concatenate((train_images, test_images))
-    labels_list = np.concatenate((train_labels, test_labels))
+# linear classifier using knn to test generalisation
+def knn_classifier(train_images, train_labels, test_images, test_labels):
+    cum_acc_train = 0
+    cum_acc_test = 0
 
-    # Select two samples of each class as test set, classify with knn (k = 5)
-    skf = StratifiedKFold(n_splits=5, shuffle=True)  # split into 5 folds
-    skf.get_n_splits(rep_list, labels_list)
-    # sample_size = len(data_loader)
-    cumulative_accuracy = 0
-    # Now iterate through all folds
-    for train_index, test_index in skf.split(rep_list, labels_list):
-        # print("TRAIN:", train_index, "TEST:", test_index)
-        reps_train, reps_test = rep_list[train_index], rep_list[test_index]
-        labels_train, labels_test = labels_list[train_index], labels_list[test_index]
-        labels_train_vec = F.one_hot(torch.tensor(labels_train)).numpy()
-        labels_test_vec = F.one_hot(torch.tensor(labels_test)).numpy()
-
+    for i in range(10):
         neigh = KNeighborsClassifier(n_neighbors=5)  # build  KNN classifier for this fold
-        neigh.fit(reps_train, labels_train)  # Use training data for KNN classifier
-        labels_predicted = neigh.predict(reps_test)  # Predictions across test set
-        accuracy = neigh.score(reps_test, labels_test)  # score predictions on test set
+        neigh.fit(train_images, train_labels)  # Use training data for KNN classifier
+        # access acc on training data
+        cum_acc_train += neigh.score(train_images, train_labels) / 10
 
-        # reg = linear_model.LinearRegression()
-        # reg.fit(reps_train, labels_train_vec)
-        # labels_predicted = reg.predict(reps_test)
+        # labels_predicted = neigh.predict(test_images)  # Predictions across test set
+        # access acc on test data
+        cum_acc_test += neigh.score(test_images, test_labels) / 10  # score predictions on test set
 
-        # Convert to one-hot
-        # labels_predicted = (labels_predicted == labels_predicted.max(axis=1, keepdims=True)).astype(int)
+    return cum_acc_train, cum_acc_test
 
-        # Calculate accuracy on test set: put test set into model, calculate fraction of TP+TN over all responses
-        # accuracy = accuracy_score(labels_test_vec, labels_predicted)
-
-        cumulative_accuracy += accuracy / 5
-
-    return rep_list, labels_list, cumulative_accuracy
 
 # %%
-# linear classifier fitted to train loader images and tested on test loader images
-def linear_classifier(train_images, train_labels, test_images, test_labels):
+# linear regression to test generalisation
+def linear_regression(train_images, train_labels, test_images, test_labels):
     # avg classification performance over 10 rounds
     cumulative_accuracy_train = 0
     cumulative_accuracy_test = 0
@@ -141,7 +123,8 @@ def linear_classifier(train_images, train_labels, test_images, test_labels):
         reg.fit(train_images, labels_train_vec)
         # assess train set acc
         labels_predicted_train = reg.predict(train_images)
-        labels_predicted_train = (labels_predicted_train == labels_predicted_train.max(axis=1, keepdims=True)).astype(int)
+        labels_predicted_train = (labels_predicted_train == labels_predicted_train.max(axis=1, keepdims=True)).astype(
+            int)
         acc_train = accuracy_score(labels_train_vec, labels_predicted_train)
         cumulative_accuracy_train += acc_train / 10
 
@@ -157,6 +140,36 @@ def linear_classifier(train_images, train_labels, test_images, test_labels):
         cumulative_accuracy_test += accuracy / 10
 
     return cumulative_accuracy_train, cumulative_accuracy_test
+
+# %%
+def within_sample_classification_stratified(representations, labels):
+    skf = StratifiedKFold(n_splits=5, shuffle=True)  # split into 5 folds
+    skf.get_n_splits(representations, labels)
+    cumulative_accuracy = 0
+    # Now iterate through all folds
+    for train_index, test_index in skf.split(representations, labels):
+        # print("TRAIN:", train_index, "TEST:", test_index)
+        reps_train, reps_test = representations[train_index], representations[test_index]
+        labels_train, labels_test = labels[train_index], labels[test_index]
+        labels_train_vec = F.one_hot(torch.tensor(labels_train)).numpy()
+        labels_test_vec = F.one_hot(torch.tensor(labels_test)).numpy()
+
+        reg = linear_model.LinearRegression()
+        reg.fit(reps_train, labels_train_vec)
+
+        # assess performance on test set
+        labels_predicted = reg.predict(reps_test)
+
+        # Convert to one-hot
+        labels_predicted = (labels_predicted == labels_predicted.max(axis=1, keepdims=True)).astype(int)
+
+        # Calculate accuracy on test set: put test set into model, calculate fraction of TP+TN over all responses
+        accuracy = accuracy_score(labels_test_vec, labels_predicted)
+
+        cumulative_accuracy += accuracy / 5
+
+    return cumulative_accuracy
+
 
 
 # %%

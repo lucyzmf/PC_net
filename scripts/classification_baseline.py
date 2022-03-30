@@ -62,18 +62,21 @@ test_images = nn.functional.pad(test_images, (padding, padding, padding, padding
 test_images = torch.flatten(test_images, start_dim=1).numpy()
 test_labels = test_set.dataset.targets[test_indices].numpy()
 
-
+# %%
+print('Assess how clustered train still images are')
+acc_train_still = within_sample_classification_stratified(train_images, train_labels)
+print('within-sample linear regression (stratified kfold) on train still images: %.4f' % acc_train_still)
 
 # %%
+print('Assess how generalisable linear classifiers (regression and knn) are on still images')
 # acc of linear classifier on images
-images_all, labels_all, acc_knn = linear_classifier_kfold(train_images, train_labels, test_images, test_labels)
-print('cumulative accuracy over 5 folds for knn classifier on train & tst still images %.2f' % acc_knn)
+_, acc_knn = knn_classifier(train_images, train_labels, test_images, test_labels)
+print('knn classifier test acc on still images %.4f' % acc_knn)
 
 
 # %%
-cum_acc_train, cum_acc_test = linear_classifier(train_images, train_labels, test_images, test_labels)
-print('avg accuracy over 10 runs for linear classifier on train set %.4f' % cum_acc_train)
-print('avg accuracy over 10 runs for linear classifier on test set %.4f' % cum_acc_test)
+cum_acc_train, cum_acc_test = linear_regression(train_images, train_labels, test_images, test_labels)
+print('linear regression test acc on still %.4f' % cum_acc_test)
 
 
 # %%
@@ -130,9 +133,11 @@ for epoch in range(int(epochs)):
             final_acc = accuracy
             print("Iteration: {}. Loss: {}. Accuracy: {}.".format(iter, loss.item(), accuracy))
 
-print('final logistic regression classification acc on image itself: %.2f' % final_acc)
+print('logistic regression test acc on still img: %.2f' % final_acc)
 
 # %%
+images_all = np.concatenate((train_images, test_images))
+labels_all = np.concatenate((train_labels, test_labels))
 # use clustering technique on flattened images to examine baseline clusters of dataset
 print('tSNE clustering')
 time_start = time.time()
@@ -162,7 +167,10 @@ plt.show()
 fig.savefig(os.path.join(config['dataset_dir'], 'tSNE_clustering_rep'))
 
 # %%
+######################
 # classification of sequence training images
+######################
+
 train_set_spin = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader_spin.pth'))
 test_set_spin = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_loader_spin.pth'))
 
@@ -196,20 +204,34 @@ idx = np.random.permutation(idx)
 test_seq_spin = test_seq_spin[idx]
 test_labels_spin = test_labels_spin[idx]
 
-cum_acc_train_spin, cum_acc_test_spin = linear_classifier(train_seq_spin, train_labels_spin, test_seq_spin, test_labels_spin)
-print('avg accuracy over 10 runs for linear classifier on sequence train dataset %.4f' % cum_acc_train_spin)
-print('avg accuracy over 10 runs for linear classifier on sequence test dataset %.4f' % cum_acc_test_spin)
+# %%
+print('Assess how clustered train seq frames are')
+acc_train_seq = within_sample_classification_stratified(train_seq_spin, train_labels_spin)
+print('within-sample linear regression (stratified kfold) on train seq frames: %.4f' % acc_train_seq)
+
+# %%
+
+cum_acc_train_spin, cum_acc_test_spin = linear_regression(train_seq_spin, train_labels_spin, test_seq_spin,
+                                                          test_labels_spin)
+print('linear regression test acc on sequence dataset %.4f' % cum_acc_test_spin)
 
 
 # %%
 # acc of linear classifier on images
-images_all_spin, labels_all_spin, acc_knn_spin = linear_classifier_kfold(train_seq_spin, train_labels_spin, test_seq_spin, test_labels_spin)
-print('cumulative accuracy over 5 folds for knn classifier on sequence dataset (train and test) %.4f' % acc_knn)
+_, acc_knn_test_spin = knn_classifier(train_seq_spin, train_labels_spin, test_seq_spin, test_labels_spin)
+print('knn classifier test acc on sequence dataset %.4f' % acc_knn_test_spin)
 
 # %%
 # acc of linear classifier trained on frames of sequence and tested on still images
-acc_train_seq, acc_test_still = linear_classifier(train_seq_spin, train_labels_spin, test_images, test_labels)
-print('linear classifier trained on sequence tested on still: train acc %.4f, test acc %.4f' % (acc_train_seq, acc_test_still))
+####################
+# key baseline
+####################
+
+acc_train_seq, acc_test_still = linear_regression(train_seq_spin, train_labels_spin, test_images, test_labels)
+print('linear regression trained on sequence frames tested on still test acc %.4f' % acc_test_still)
+
+acc_train_seq, acc_test_still = knn_classifier(train_seq_spin, train_labels_spin, test_images, test_labels)
+print('knn classifier trained on sequence frames tested on still test acc %.4f' % acc_test_still)
 
 # %%
 #######################

@@ -287,7 +287,7 @@ fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one class 
 
 # %%
 # rdm of all classes of sequences
-pair_dist_cosine = pairwise_distances(seq_frames, metric='euclidean')
+pair_dist_cosine = pairwise_distances(seq_frames, metric='cosine')
 fig, ax = plt.subplots()
 im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)

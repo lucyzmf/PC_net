@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 from sklearn import linear_model
 from sklearn.metrics import pairwise_distances, accuracy_score
 from sklearn.model_selection import StratifiedKFold
+from sklearn.neighbors import KNeighborsClassifier
 
 
 def test_frame(model, test_data, inference_steps):
@@ -107,19 +108,20 @@ def linear_classifier_kfold(train_images, train_labels, test_images, test_labels
         labels_train_vec = F.one_hot(torch.tensor(labels_train)).numpy()
         labels_test_vec = F.one_hot(torch.tensor(labels_test)).numpy()
 
-        # neigh = KNeighborsClassifier(n_neighbors=3, metric = distance) # build  KNN classifier for this fold
-        # neigh.fit(reps_train, labels_train) # Use training data for KNN classifier
-        # labels_predicted = neigh.predict(reps_test) # Predictions across test set
+        neigh = KNeighborsClassifier(n_neighbors=5)  # build  KNN classifier for this fold
+        neigh.fit(reps_train, labels_train)  # Use training data for KNN classifier
+        labels_predicted = neigh.predict(reps_test)  # Predictions across test set
+        accuracy = neigh.score(reps_test, labels_test)  # score predictions on test set
 
-        reg = linear_model.LinearRegression()
-        reg.fit(reps_train, labels_train_vec)
-        labels_predicted = reg.predict(reps_test)
+        # reg = linear_model.LinearRegression()
+        # reg.fit(reps_train, labels_train_vec)
+        # labels_predicted = reg.predict(reps_test)
 
         # Convert to one-hot
-        labels_predicted = (labels_predicted == labels_predicted.max(axis=1, keepdims=True)).astype(int)
+        # labels_predicted = (labels_predicted == labels_predicted.max(axis=1, keepdims=True)).astype(int)
 
         # Calculate accuracy on test set: put test set into model, calculate fraction of TP+TN over all responses
-        accuracy = accuracy_score(labels_test_vec, labels_predicted)
+        # accuracy = accuracy_score(labels_test_vec, labels_predicted)
 
         cumulative_accuracy += accuracy / 5
 

@@ -24,6 +24,8 @@ config = load_config("config.yaml")
 reg_strength = config['reg_strength']
 reg_type = config['reg_type']
 infstep_before_update = config['infstep_before_update']
+act_normalise = config['act_norm']
+norm_constant = config['norm_constant']
 
 
 #  sigmoid activation function
@@ -66,7 +68,7 @@ class FCLayer(nn.Module):
     # def reset_state(self):
     # reinitialise activation and output values
 
-    def forward(self, bu_errors, r_act, r_out, nextlayer_r_out):
+    def forward(self, bu_errors, r_act, r_out, nextlayer_r_out, norm=act_normalise, constant=norm_constant):
         # values that is needed per layer: e, r_act, r_out
         # prediction: w_l, r_out_l+1
         # inference: e_l (y_l-pred), w_l-1, e_l-1, return updated e, r_act, r_out
@@ -75,6 +77,9 @@ class FCLayer(nn.Module):
                                      nextlayer_r_out)  # The activity of error neurons is representation - prediction.
         r_act = r_act + self.infRate * (
                 bu_errors - e_act)  # Inference step: Modify activity depending on error
+        # add activity normalisation of neurons
+        if norm:
+            r_act = r_act**2 / (constant + torch.sum(r_act)**2)
         r_out = self.actFunc(r_act)  # Apply the activation function to get neuronal output
         return e_act, r_act, r_out
 

@@ -67,6 +67,8 @@ if __name__ == '__main__':
     reg_strength = config['reg_strength']
     reg_type = config['reg_type']
     infstep_before_update = config['infstep_before_update']
+    act_normalise = config['act_norm']
+    norm_constant = config['norm_constant']
 
     # load data
     if seq_train:
@@ -126,6 +128,8 @@ if __name__ == '__main__':
         wbconfig.reg_strength = reg_strength
         wbconfig.reg_type = reg_type
         wbconfig.update_per_frame = inference_steps / infstep_before_update
+        wbconfig.act_normalise = act_normalise
+        wbconfig.norm_constant = norm_constant
 
         #  network instantiation
         if arch_type == 'FcDHPC':

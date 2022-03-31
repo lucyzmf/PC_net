@@ -35,7 +35,7 @@ pin_mem = config['pin_mem']
 batchSize = config['batch_size']
 n_workers = config['num_workers']
 padding = config['padding_size']
-data_width = 28+padding*2
+data_width = 28 + padding * 2
 num_classes = 10
 
 # download data
@@ -70,8 +70,6 @@ test_dataset = Subset(full_dataset, test_indices)
 torch.save(train_dataset, os.path.join(data_dir, str(dataset) + 'train_image.pt'))
 torch.save(test_dataset, os.path.join(data_dir, str(dataset) + 'test_image.pt'))
 
-
-
 # %%
 ##########################
 # spinning sequences
@@ -86,7 +84,6 @@ direction = 2  # clockwise and anticlockwise
 
 f = (2 * data_width ** 2) ** .5  # focal length for projection
 
-
 # TODO: keep track of which rotation type and what direction per seq in a separate file
 
 
@@ -97,7 +94,8 @@ train_x, train_y, train_log = generate_spin_sequence(train_dataset, rotation_axi
 
 # %%
 # shuffle sequence, targets, and log
-train_x, train_y, train_log['rotation_axis'], train_log['direction'] = shuffle([train_x, train_y, train_log['rotation_axis'], train_log['direction']])
+train_x, train_y, train_log['rotation_axis'], train_log['direction'] = shuffle(
+    [train_x, train_y, train_log['rotation_axis'], train_log['direction']])
 
 # %%
 # collapse first two dimensions of train_x, add dimension to train_y
@@ -124,7 +122,8 @@ test_x, test_y, test_log = generate_spin_sequence(test_dataset, rotation_axis, d
                                                   frames=frames_per_sequence, w=data_width, focal=f)
 
 # shuffle sequence, targets, and log
-test_x, test_y, test_log['rotation_axis'], test_log['direction'] = shuffle([test_x, test_y, test_log['rotation_axis'], test_log['direction']])
+test_x, test_y, test_log['rotation_axis'], test_log['direction'] = shuffle(
+    [test_x, test_y, test_log['rotation_axis'], test_log['direction']])
 
 # %%
 # collapse first two dimensions of train_x, add dimension to train_y
@@ -142,8 +141,21 @@ test_loader_spin = data.DataLoader(test_set_spin, batch_size=batchSize, num_work
 torch.save(train_loader_spin, os.path.join(data_dir, str(dataset) + 'train_loader_spin.pth'))
 torch.save(test_loader_spin, os.path.join(data_dir, str(dataset) + 'test_loader_spin.pth'))
 
+# %%
+# save log of stimuli rotation type and direction to csv
+import csv
 
+field_names = ['rotation_axis', 'direction']
 
+with open('train_stimulus_type_log.csv', 'w') as csvfile:
+    writer = csv.DictWriter(csvfile, fieldnames=field_names)
+    writer.writeheader()
+    writer.writerows(train_log)
+
+with open('test_stimulus_type_log.csv', 'w') as csvfile:
+    writer = csv.DictWriter(csvfile, fieldnames=field_names)
+    writer.writeheader()
+    writer.writerows(test_log)
 #
 # %%
 

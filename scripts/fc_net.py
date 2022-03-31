@@ -76,7 +76,7 @@ class FCLayer(nn.Module):
         e_act = r_out - torch.matmul(self.weights,
                                      nextlayer_r_out)  # The activity of error neurons is representation - prediction.
         # pass e_act through activation function
-        e_act = self.actFunc(e_act)
+        e_act = torch.tanh(e_act)
 
         r_act = r_act + self.infRate * (
                 bu_errors - e_act)  # Inference step: Modify activity depending on error

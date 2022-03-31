@@ -214,7 +214,7 @@ if __name__ == '__main__':
                     if (epoch % 10 == 0) or (epoch == epochs - 1):
                         rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
                         label_train.append(label)
-                    # net.init_states()
+                    net.init_states()
 
             # summary data
             total_errors.append(np.mean(errors))  # mean error per epoch

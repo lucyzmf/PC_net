@@ -106,7 +106,7 @@ if __name__ == '__main__':
         dataWidth = 28 + 2*config['padding_size']
 
         # Hyperparameters for training logged with wandb
-        wandb.init(project="DHPC_morph_test_2", entity="lucyzmf")  # , mode='disabled')
+        wandb.init(project="DHPC_morph", entity="lucyzmf")  # , mode='disabled')
 
         wbconfig = wandb.config
         wbconfig.infstep = inference_steps
@@ -214,7 +214,7 @@ if __name__ == '__main__':
                     if (epoch % 10 == 0) or (epoch == epochs - 1):
                         rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
                         label_train.append(label)
-                    net.init_states()
+                    # net.init_states()
 
             # summary data
             total_errors.append(np.mean(errors))  # mean error per epoch

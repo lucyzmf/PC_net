@@ -25,7 +25,7 @@ now = datetime.datetime.now()
 # load config
 CONFIG_PATH = "../scripts/"
 
-test_name = 'morph_test_2_'
+test_name = 'morph_test_6_'
 
 def load_config(config_name):
     with open(os.path.join(CONFIG_PATH, config_name)) as file:

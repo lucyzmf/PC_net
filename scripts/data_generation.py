@@ -3,6 +3,7 @@ this script takes the images from fashion mnist to generate datasets that can be
 input parameters from config: samples per class from fashion mnist, num of frames per sequences, morph type,
 '''
 import os
+import pickle
 
 import torchvision
 import yaml
@@ -143,19 +144,13 @@ torch.save(test_loader_spin, os.path.join(data_dir, str(dataset) + 'test_loader_
 
 # %%
 # save log of stimuli rotation type and direction to csv
-import csv
 
-field_names = ['rotation_axis', 'direction']
+with open(data_dir + '/train_log.pkl', 'wb') as f:
+    pickle.dump(train_log, f)
 
-with open('train_stimulus_type_log.csv', 'w') as csvfile:
-    writer = csv.DictWriter(csvfile, fieldnames=field_names)
-    writer.writeheader()
-    writer.writerows(train_log)
+with open(data_dir + '/test_log.pkl', 'wb') as f:
+    pickle.dump(test_log, f)
 
-with open('test_stimulus_type_log.csv', 'w') as csvfile:
-    writer = csv.DictWriter(csvfile, fieldnames=field_names)
-    writer.writeheader()
-    writer.writerows(test_log)
 #
 # %%
 

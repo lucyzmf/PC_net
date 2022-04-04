@@ -105,6 +105,8 @@ class input_layer(FCLayer):
     # Additional class for the input layer. This layer does not use a full inference step (driven only by input).
     def forward(self, inputs, nextlayer_r_out):
         e_act = inputs.to(self.device) - torch.matmul(self.weights, nextlayer_r_out)
+        # pass e_act through tanh
+        e_act = torch.tanh(e_act)
         return e_act
 
 

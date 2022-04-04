@@ -10,10 +10,10 @@ num_workers: 2
 padding_size: 5
 
 # network hyperparameters
-epochs: 200
+epochs: 40
 infsteps: 100
 infrates: [.01, .01, .01, .01]
-network_size: [1444, 2000, 200, 50]
+network_size: [1444, 2000, 100]
 learning_rate: .001
 act_func: sigmoid  # relu, sigmoid
 per_seq_repeat: 1

@@ -69,6 +69,7 @@ if __name__ == '__main__':
     infstep_before_update = config['infstep_before_update']
     act_normalise = config['act_norm']
     norm_constant = config['norm_constant']
+    reset_per_frame = config['reset_per_frame']
 
     # load data
     if seq_train:
@@ -130,6 +131,7 @@ if __name__ == '__main__':
         wbconfig.update_per_frame = inference_steps / infstep_before_update
         wbconfig.act_normalise = act_normalise
         wbconfig.norm_constant = norm_constant
+        wbconfig.reset_per_frame = reset_per_frame
 
         #  network instantiation
         if arch_type == 'FcDHPC':
@@ -208,11 +210,17 @@ if __name__ == '__main__':
                         'layer 0 error activation': wandb.Histogram(net.states['error'][0].detach().cpu())
                     })
 
-                if seq_train and ((i+1) % frame_per_seq == 0):  # if trained on sequences
-                    if (epoch % 10 == 0) or (epoch == epochs-1):
-                        rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
-                        label_train.append(label)
-                    net.init_states()
+                if seq_train:
+                    if not reset_per_frame and ((i+1) % frame_per_seq == 0):  # if trained on sequences and reps taken at the end of seq
+                        if (epoch % 10 == 0) or (epoch == epochs-1):
+                            rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
+                            label_train.append(label)
+                        net.init_states()
+                    if reset_per_frame:  # if seq training but reset after each frame
+                        if (epoch % 10 == 0) or (epoch == epochs-1):
+                            rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
+                            label_train.append(label)
+                        net.init_states()
 
                 if not seq_train:  # if trained on still images
                     if (epoch % 10 == 0) or (epoch == epochs - 1):

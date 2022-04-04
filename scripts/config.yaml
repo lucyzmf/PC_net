@@ -24,7 +24,7 @@ rf_sizes: [5, 9, 15]
 
 # used to generate morphing dataset
 frame_per_sequence: 5
-seq_train: False  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
+seq_train: True  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
 reset_per_frame: False
 morph_type: spin
 reg_strength: .1

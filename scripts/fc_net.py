@@ -26,6 +26,7 @@ reg_type = config['reg_type']
 infstep_before_update = config['infstep_before_update']
 act_normalise = config['act_norm']
 norm_constant = config['norm_constant']
+batch_size = config['batch_size']
 
 
 #  sigmoid activation function
@@ -42,7 +43,7 @@ def relu(inputs):
 
 class FCLayer(nn.Module):
     #  object class for standard layer in DHPC with error and representational units
-    def __init__(self, layer_size: int, out_size: int, inf_rate: float, device, dtype, lr_rate, act_func
+    def __init__(self, layer_size: int, out_size: int, inf_rate: float, device, dtype, lr_rate, act_func, batch=batch_size
                  ) -> None:
         factory_kwargs = {'device': device, 'dtype': dtype}
         super(FCLayer, self).__init__()  # super().__init__()
@@ -87,6 +88,10 @@ class FCLayer(nn.Module):
         return e_act, r_act, r_out
 
     def w_update(self, e_act, nextlayer_output, reg_constant=reg_strength, r_type=reg_type):
+        # compute update and average across batch dim
+        update = torch.bmm(e_act, torch.transpose(nextlayer_output, 1, 2))
+        update = torch.mean(update, dim=0)
+        # select reg type
         if r_type == 'l1':
             reg_matrix = -torch.sign(torch.clone(self.weights))
             reg_matrix = reg_constant * reg_matrix
@@ -96,7 +101,7 @@ class FCLayer(nn.Module):
         else:
             reg_matrix = 0
         # Learning step
-        delta = self.learn_rate * (torch.matmul(e_act.reshape(-1, 1), nextlayer_output.reshape(1, -1)) + reg_matrix)
+        delta = self.learn_rate * (update + reg_matrix)
         self.weights = nn.Parameter(torch.clamp(self.weights + delta, min=0))  # Keep only positive weights
         # self.weights = nn.Parameter(self.weights + delta)  # keep both positive and negative weights
 
@@ -104,7 +109,7 @@ class FCLayer(nn.Module):
 class input_layer(FCLayer):
     # Additional class for the input layer. This layer does not use a full inference step (driven only by input).
     def forward(self, inputs, nextlayer_r_out):
-        e_act = inputs.to(self.device) - torch.matmul(self.weights, nextlayer_r_out)
+        e_act = inputs.to(self.device) - torch.bmm(self.weights, nextlayer_r_out)
         # pass e_act through tanh
         e_act = torch.tanh(e_act)
         return e_act
@@ -126,39 +131,40 @@ class output_layer(FCLayer):
 # whenever forward pass is called, reads state dict first, then do computation
 
 class FcDHPC(nn.Module):
-    def __init__(self, network_arch, inf_rates, lr, act_func, device, dtype):
+    def __init__(self, network_arch, inf_rates, lr, act_func, device, dtype, batch=batch_size):
         super().__init__()
         e_act, r_act, r_out = [], [], []  # a list that always keep tracks of internal state values
         self.layers = nn.ModuleList().to(device)  # create module list containing all layers
         self.architecture = network_arch
         self.inf_rates = inf_rates
         self.device = device
+        self.batch = batch
         self.dtype = dtype
 
         # e, r_act, r_out each an array, each index correspond to layer
         for layer in range(len(network_arch)):
             r_act.append(
-                torch.zeros(network_arch[layer]).to(device))  # tensor containing activation of representational units
+                torch.zeros(batch, network_arch[layer], 1).to(device))  # tensor containing activation of representational units
             r_out.append(
-                torch.zeros(network_arch[layer]).to(device))  # tensor containing output of representational units
+                torch.zeros(batch, network_arch[layer], 1).to(device))  # tensor containing output of representational units
             if layer == 0:
                 # add input layer to module list, add input layer state list
-                e_act.append(torch.zeros(network_arch[layer]).to(device))
+                e_act.append(torch.zeros(batch, network_arch[layer], 1).to(device))
                 self.layers.append(
                     input_layer(network_arch[0], network_arch[1], inf_rates[0], device=device, dtype=dtype, lr_rate=lr,
-                                act_func=act_func))  # append input layer to modulelist
+                                act_func=act_func, batch_size=batch))  # append input layer to modulelist
             elif layer != len(network_arch) - 1:
                 # add middle layer to module list and state list
-                e_act.append(torch.zeros(network_arch[layer]).to(device))  # tensor containing activation of error units
+                e_act.append(torch.zeros(batch, network_arch[layer], 1).to(device))  # tensor containing activation of error units
                 self.layers.append(
                     FCLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer], device=device,
                             dtype=dtype,
-                            lr_rate=lr, act_func=act_func))
+                            lr_rate=lr, act_func=act_func, batch_size=batch))
             else:
                 # add output layer to module list
-                e_act.append(None)
+                e_act.append(torch.zeros(batch, network_arch[layer], 1))
                 self.layers.append(output_layer(network_arch[layer], network_arch[layer], inf_rates[layer],
-                                                device=device, dtype=dtype, lr_rate=lr, act_func=act_func))
+                                                device=device, dtype=dtype, lr_rate=lr, act_func=act_func, batch_size=batch))
 
         self.states = {
             'error': e_act,
@@ -170,15 +176,18 @@ class FcDHPC(nn.Module):
         # initialise values in state dict
         for i in range(len(self.states['r_activation'])):
             if i != len(self.architecture) - 1:
-                self.states['error'][i] = torch.zeros(self.architecture[i]).to(self.device)
-            self.states['r_activation'][i] = -2 * torch.ones(self.architecture[i]).to(self.device)
+                self.states['error'][i].fill_(0).to(self.device)
+            self.states['r_activation'][i].fill_(-2).to(self.device)
             self.states['r_output'][i] = self.layers[i].actFunc(self.states['r_activation'][i])
 
     def forward(self, frame, inference_steps, istrain=True, inf_before_learn=infstep_before_update):
         # frame is input to the lowest layer, inference steps
         e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
         layers = self.layers
-        r_act[0] = torch.flatten(frame)  # r units of first layer reflect input
+        w_holder = []
+        for i in range(len(self.architecture)):
+            w_holder.append(layers[i].weights.repeat(self.batch, 1, 1))  # expand weight matrix at beginning of each batch
+        r_act[0] = frame.view(-1, self.architecture[0])  # r units of first layer reflect input
         r_out[0] = layers[0].actFunc(r_act[0])
 
         # inference process
@@ -186,15 +195,15 @@ class FcDHPC(nn.Module):
             e_act[0] = layers[0](r_act[0], r_out[1])  # update first layer, given inputs, calculate error
             for j in range(1, len(layers) - 1):  # iterate through middle layers, forward inference
                 e_act[j], r_act[j], r_out[j] = layers[j](
-                    torch.matmul(torch.transpose(layers[j - 1].weights, 0, 1), e_act[j - 1]),
+                    torch.bmm(torch.transpose(w_holder[j - 1], 1, 2), e_act[j - 1]),
                     r_act[j], r_out[j], r_out[j + 1])
             # update states of last layer
-            r_act[-1], r_out[-1] = layers[-1](torch.matmul(torch.transpose(layers[-2].weights, 0, 1), e_act[-2]),
+            r_act[-1], r_out[-1] = layers[-1](torch.bmm(torch.transpose(w_holder[-2], 1, 2), e_act[-2]),
                                               r_act[-1])
 
-            if istrain:
-                if i > 0 and i % inf_before_learn == 0:
-                    self.learn()
+            # if istrain:
+            #     if i > 0 and i % inf_before_learn == 0:
+            #         self.learn()
 
     def learn(self):
         # iterate through all non last layers to update weights

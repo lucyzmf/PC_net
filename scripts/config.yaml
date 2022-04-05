@@ -5,7 +5,7 @@ dataset_type: fashionMNIST
 train_size: 30
 test_size: 5
 pin_mem: True
-batch_size: 1
+batch_size: 10
 num_workers: 2
 padding_size: 5
 

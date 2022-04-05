@@ -26,16 +26,20 @@ def compute_loss(update_for, net, criterion):
     losses = []
     if update_for == 'weights':
         for l in range(len(net.architecture) - 1):
-            losses += [criterion(net.states['r_out'][l], torch.matmul(net.layers[l].weights, net.states['r_out'][l+1]))]
+            losses += [criterion(net.states['r_output'][l],
+                                 torch.matmul(net.layers[l].weights, net.states['r_output'][l+1]))]
+
+    if len(losses) != len(net.architecture)-1:
+        raise Exception('loss computation is wrong')
 
     return losses
 
 
-def compute_gradient(losses):
+def compute_gradient(net, losses):
     n_layer = len(losses)
 
     for l in range(n_layer):
-        losses[l].backward()
+        torch.autograd.backward(net.layers[l].weights, grad_tensors=net.layers[l].weights.grad, retain_graph=True)
 
 
 def w_update(w_optimizer):

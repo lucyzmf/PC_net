@@ -28,7 +28,7 @@ seq_train: True  # whether to train network on seq, if true load dataloader of s
 reset_per_frame: False
 morph_type: spin
 reg_strength: .1
-reg_type: l2
+reg_type: none
 infstep_before_update: 50
 act_norm: False
 norm_constant: .0001

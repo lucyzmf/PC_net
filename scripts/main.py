@@ -210,19 +210,13 @@ if __name__ == '__main__':
                         'layer 0 error activation': wandb.Histogram(net.states['error'][0].detach().cpu())
                     })
 
-                if seq_train:
-                    if not reset_per_frame and ((i+1) % frame_per_seq == 0):  # if trained on sequences and reps taken at the end of seq
-                        if (epoch % 10 == 0) or (epoch == epochs-1):
-                            rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
-                            label_train.append(label)
-                        net.init_states()
-                    if reset_per_frame:  # if seq training but reset after each frame
-                        if (epoch % 10 == 0) or (epoch == epochs-1):
-                            rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
-                            label_train.append(label)
-                        net.init_states()
+                if (seq_train and not reset_per_frame) and ((i+1) % frame_per_seq == 0):  # if trained on sequences and reps taken at the end of seq
+                    if (epoch % 10 == 0) or (epoch == epochs-1):
+                        rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
+                        label_train.append(label)
+                    net.init_states()
 
-                if not seq_train:  # if trained on still images
+                if not seq_train or (seq_train and reset_per_frame):  # if trained on still images or seq train but reset per frame
                     if (epoch % 10 == 0) or (epoch == epochs - 1):
                         rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
                         label_train.append(label)
@@ -295,11 +289,7 @@ if __name__ == '__main__':
                     net.init_states()
                     for i, (_image, _label) in enumerate(test_loader):  # generate high level rep using spin seq test dataset
                         net(_image, inference_steps, istrain=False)
-                        if not reset_per_frame and ((i + 1) % frame_per_seq) == 0:  # at the end of each sequence
-                            seq_rep_test.append(net.states['r_activation'][-1].detach().cpu().numpy())  # rep recorded at end of each seq
-                            seq_label_test.append(_label)
-                            net.init_states()
-                        if reset_per_frame:
+                        if (i + 1) % frame_per_seq == 0:  # at the end of each sequence
                             seq_rep_test.append(net.states['r_activation'][-1].detach().cpu().numpy())  # rep recorded at end of each seq
                             seq_label_test.append(_label)
                             net.init_states()

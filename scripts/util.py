@@ -1,6 +1,50 @@
 import numpy as np
 import torch
 from skimage.transform import warp
+
+# %%
+from torch import optim
+
+
+def create_w_optimizers(net, lr):
+    w_optimizer = []
+
+    for l in range(len(net.architecture) - 1):
+        w_optimizer += [optim.SGD([net.layers[l].weights], lr=lr)]
+
+    return w_optimizer
+
+
+def reset_w_grads(w_optimizer):
+    n_optimizers = len(w_optimizer)
+
+    for l in range(n_optimizers):
+        w_optimizer[l].zero_grad()
+
+
+def compute_loss(update_for, net, criterion):
+    losses = []
+    if update_for == 'weights':
+        for l in range(len(net.architecture) - 1):
+            losses += [criterion(net.states['r_out'][l], torch.matmul(net.layers[l].weights, net.states['r_out'][l+1]))]
+
+    return losses
+
+
+def compute_gradient(losses):
+    n_layer = len(losses)
+
+    for l in range(n_layer):
+        losses[l].backward()
+
+
+def w_update(w_optimizer):
+    n_optimizers = len(w_optimizer)
+
+    for l in range(n_optimizers):
+        w_optimizer[l].step()
+
+
 # %%
 # transformation function
 # code from https://towardsdatascience.com/how-to-transform-a-2d-image-into-a-3d-space-5fc2306e3d36

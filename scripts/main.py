@@ -290,7 +290,7 @@ if __name__ == '__main__':
                     for i, (_image, _label) in enumerate(test_loader):  # generate high level rep using spin seq test dataset
                         net(_image, inference_steps, istrain=False)
                         if (i + 1) % frame_per_seq == 0:  # at the end of each sequence
-                            seq_rep_test.append(net.states['r_activation'][-1].detach().cpu().numpy())  # rep recorded at end of each seq
+                            seq_rep_test.append(torch.flatten(net.states['r_activation'][-1], 1).detach().cpu().numpy())  # rep recorded at end of each seq
                             seq_label_test.append(_label)
                             net.init_states()
                     # convert arrays

@@ -223,8 +223,7 @@ class FcDHPC(nn.Module):
         label = label.item()
         error = self.total_error()
 
-        reconstructed_frame = self.layers[0].weights @ torch.squeeze(self.states['r_output'][0][1])  # take the first sample in batch for reconstruction
-        reconstructed_frame = reconstructed_frame.detach().cpu().numpy()
+        reconstructed_frame = self.layers[0].weights.detach().cpu().numpy() @ torch.squeeze(self.states['r_output'][0][1].detach().cpu().numpy())  # take the first sample in batch for reconstruction
         img_width = int(np.sqrt(len(reconstructed_frame)))
 
         fig, ax = plt.subplots()

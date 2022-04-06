@@ -219,11 +219,11 @@ class FcDHPC(nn.Module):
 
     def reconstruct(self, image, label, infsteps):  # reconstruct from second layer output using a single image
         self.init_states()
-        self.forward(image.view(batch_size, self.architecture[0], 1), infsteps)
+        self.forward(image.repeat(batch_size, 1, 1), infsteps)
         label = label.item()
         error = self.total_error()
 
-        reconstructed_frame = self.layers[0].weights @ self.states['r_output'][0][1]  # take the first sample in batch for reconstruction
+        reconstructed_frame = self.layers[0].weights @ torch.squeeze(self.states['r_output'][0][1])  # take the first sample in batch for reconstruction
         reconstructed_frame = reconstructed_frame.detach().cpu().numpy()
         img_width = int(np.sqrt(len(reconstructed_frame)))
 

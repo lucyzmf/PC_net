@@ -246,7 +246,7 @@ if __name__ == '__main__':
                     net.init_states()
                     net(_image, inference_steps, istrain=False)
                     errors_test.append(net.total_error())
-                    rep_still_test.append(net.states['r_activation'][-1].detach().cpu().numpy())
+                    rep_still_test.append(torch.flatten(net.states['r_activation'][-1], 1).detach().cpu().numpy())
                     rep_still_labels.append(_label)
 
                 # log errors

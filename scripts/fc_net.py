@@ -43,7 +43,7 @@ def relu(inputs):
 
 class FCLayer(nn.Module):
     #  object class for standard layer in DHPC with error and representational units
-    def __init__(self, layer_size: int, out_size: int, inf_rate: float, device, dtype, lr_rate, act_func, batch=batch_size
+    def __init__(self, layer_size: int, out_size: int, inf_rate: float, device, dtype, lr_rate, act_func
                  ) -> None:
         factory_kwargs = {'device': device, 'dtype': dtype}
         super(FCLayer, self).__init__()  # super().__init__()
@@ -69,13 +69,13 @@ class FCLayer(nn.Module):
     # def reset_state(self):
     # reinitialise activation and output values
 
-    def forward(self, bu_errors, r_act, r_out, nextlayer_r_out, norm=act_normalise, constant=norm_constant):
+    def forward(self, bu_errors, r_act, r_out, nextlayer_r_out, w_holder_layer, norm=act_normalise, constant=norm_constant):
         # values that is needed per layer: e, r_act, r_out
         # prediction: w_l, r_out_l+1
         # inference: e_l (y_l-pred), w_l-1, e_l-1, return updated e, r_act, r_out
+        # TODO all state dict are 3 dim tensors, weight matrix stored in layer is 2d, but 3d weight tensor with batch dim is needed for inference & prediction
 
-        e_act = r_out - torch.matmul(self.weights,
-                                     nextlayer_r_out)  # The activity of error neurons is representation - prediction.
+        e_act = r_out - torch.bmm(w_holder_layer, nextlayer_r_out)  # The activity of error neurons is representation - prediction.
         # pass e_act through activation function
         e_act = torch.tanh(e_act)
 
@@ -83,7 +83,7 @@ class FCLayer(nn.Module):
                 bu_errors - e_act)  # Inference step: Modify activity depending on error
         # add activity normalisation of neurons
         if norm:
-            r_act = r_act**2 / (constant + torch.sum(r_act)**2)
+            r_act = r_act**2 / (constant + torch.sum(r_act, (1, 2))**2)  # normalise based on sum of r_act in each sample of batch
         r_out = self.actFunc(r_act)  # Apply the activation function to get neuronal output
         return e_act, r_act, r_out
 
@@ -108,8 +108,8 @@ class FCLayer(nn.Module):
 
 class input_layer(FCLayer):
     # Additional class for the input layer. This layer does not use a full inference step (driven only by input).
-    def forward(self, inputs, nextlayer_r_out):
-        e_act = inputs.to(self.device) - torch.bmm(self.weights, nextlayer_r_out)
+    def forward(self, inputs, nextlayer_r_out, w_holder_layer):
+        e_act = inputs.to(self.device) - torch.bmm(w_holder_layer, nextlayer_r_out)
         # pass e_act through tanh
         e_act = torch.tanh(e_act)
         return e_act
@@ -152,19 +152,19 @@ class FcDHPC(nn.Module):
                 e_act.append(torch.zeros(batch, network_arch[layer], 1).to(device))
                 self.layers.append(
                     input_layer(network_arch[0], network_arch[1], inf_rates[0], device=device, dtype=dtype, lr_rate=lr,
-                                act_func=act_func, batch_size=batch))  # append input layer to modulelist
+                                act_func=act_func))  # append input layer to modulelist
             elif layer != len(network_arch) - 1:
                 # add middle layer to module list and state list
                 e_act.append(torch.zeros(batch, network_arch[layer], 1).to(device))  # tensor containing activation of error units
                 self.layers.append(
                     FCLayer(network_arch[layer], network_arch[layer + 1], inf_rates[layer], device=device,
                             dtype=dtype,
-                            lr_rate=lr, act_func=act_func, batch_size=batch))
+                            lr_rate=lr, act_func=act_func))
             else:
                 # add output layer to module list
                 e_act.append(torch.zeros(batch, network_arch[layer], 1))
                 self.layers.append(output_layer(network_arch[layer], network_arch[layer], inf_rates[layer],
-                                                device=device, dtype=dtype, lr_rate=lr, act_func=act_func, batch_size=batch))
+                                                device=device, dtype=dtype, lr_rate=lr, act_func=act_func))
 
         self.states = {
             'error': e_act,
@@ -185,18 +185,18 @@ class FcDHPC(nn.Module):
         e_act, r_act, r_out = self.states['error'], self.states['r_activation'], self.states['r_output']
         layers = self.layers
         w_holder = []
-        for i in range(len(self.architecture)):
+        for i in range(len(layers)):
             w_holder.append(layers[i].weights.repeat(self.batch, 1, 1))  # expand weight matrix at beginning of each batch
-        r_act[0] = frame.view(-1, self.architecture[0])  # r units of first layer reflect input
+        r_act[0] = frame.view(-1, self.architecture[0], 1)  # r units of first layer reflect input
         r_out[0] = layers[0].actFunc(r_act[0])
 
         # inference process
         for i in range(inference_steps):
-            e_act[0] = layers[0](r_act[0], r_out[1])  # update first layer, given inputs, calculate error
+            e_act[0] = layers[0](r_act[0], r_out[1], w_holder[0])  # update first layer, given inputs, calculate error
             for j in range(1, len(layers) - 1):  # iterate through middle layers, forward inference
                 e_act[j], r_act[j], r_out[j] = layers[j](
                     torch.bmm(torch.transpose(w_holder[j - 1], 1, 2), e_act[j - 1]),
-                    r_act[j], r_out[j], r_out[j + 1])
+                    r_act[j], r_out[j], r_out[j + 1], w_holder[j])
             # update states of last layer
             r_act[-1], r_out[-1] = layers[-1](torch.bmm(torch.transpose(w_holder[-2], 1, 2), e_act[-2]),
                                               r_act[-1])
@@ -217,13 +217,13 @@ class FcDHPC(nn.Module):
             total.append(error)
         return torch.mean(torch.tensor(total))
 
-    def reconstruct(self, image, label, infsteps):  # reconstruct from second layer output
+    def reconstruct(self, image, label, infsteps):  # reconstruct from second layer output using a single image
         self.init_states()
-        self.forward(torch.flatten(image), infsteps)
+        self.forward(image.view(batch_size, self.architecture[0], 1), infsteps)
         label = label.item()
         error = self.total_error()
 
-        reconstructed_frame = self.layers[0].weights @ self.states['r_output'][1]
+        reconstructed_frame = self.layers[0].weights @ self.states['r_output'][0][1]  # take the first sample in batch for reconstruction
         reconstructed_frame = reconstructed_frame.detach().cpu().numpy()
         img_width = int(np.sqrt(len(reconstructed_frame)))
 

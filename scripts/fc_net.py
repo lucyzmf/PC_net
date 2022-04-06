@@ -53,7 +53,7 @@ class FCLayer(nn.Module):
         self.actFunc = globals()[act_func]  # activation function
         self.learn_rate = lr_rate  # learning rate
 
-        self.weights = torch.empty((layer_size, out_size), **factory_kwargs)
+        self.weights = torch.empty((layer_size, out_size), **factory_kwargs).to(device)
         self.reset_parameters()
         self.weights = nn.Parameter(self.weights, requires_grad=False)
         # self.reset_state()
@@ -162,7 +162,7 @@ class FcDHPC(nn.Module):
                             lr_rate=lr, act_func=act_func))
             else:
                 # add output layer to module list
-                e_act.append(torch.zeros(batch, network_arch[layer], 1))
+                e_act.append(torch.zeros(batch, network_arch[layer], 1).to(device))
                 self.layers.append(output_layer(network_arch[layer], network_arch[layer], inf_rates[layer],
                                                 device=device, dtype=dtype, lr_rate=lr, act_func=act_func))
 

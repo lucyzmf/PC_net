@@ -127,10 +127,11 @@ layer = []
 r_act = []
 r_out = []
 e_out = []
+labels = []
 
 with torch.no_grad():
     for i, (_image, _label) in enumerate(train_loader_spin):
-        trained_net(_image, config['infsteps'], istrain=True)
+        trained_net(_image, config['infsteps'], istrain=False)
         if i+1 % 5 == 0:
             for l in range(len(trained_net.architecture)):
                 is_train.append(1)
@@ -138,6 +139,7 @@ with torch.no_grad():
                 r_act.append(trained_net.states['r_activation'][l].numpy())
                 r_out.append(trained_net.states['r_output'][l].numpy())
                 e_out.append(trained_net.states['error'][l].numpy())
+                labels.append(_label.cpu().numpy())
 
 print(len(is_train))
 
@@ -162,7 +164,8 @@ df_reps['r_out'] = r_out
 df_reps['r_act'] = r_act
 df_reps['e_act'] = e_out
 
-df_reps.to_csv('../results/reps_df_reset_per_frame_false.csv')
+# df_reps.to_csv('../results/reps_df_reset_per_frame_false.csv')
+# %%
 
 
 # %%

@@ -25,7 +25,7 @@ def load_config(config_name):
 
 config = load_config("config.yaml")
 
-file_path = os.path.abspath('../results/80_epochs')
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs')
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
@@ -145,16 +145,17 @@ print(len(is_train))
 
 # %%
 # generate representations from test spin loader
-for i, (_image, _label) in enumerate(test_loader_spin):
-    trained_net(_image, config['infsteps'], istrain=True)
-    if i+1 % 5 == 0:
-        for l in range(len(trained_net.architecture)):
-            is_train.append(0)
-            layer.append(l)
-            r_act.append(trained_net.states['r_activation'][l].cpu().numpy())
-            r_out.append(trained_net.states['r_output'][l].cpu().numpy())
-            e_out.append(trained_net.states['error'][l].cpu().numpy())
-        trained_net.init_states()
+with torch.no_grad():
+    for i, (_image, _label) in enumerate(test_loader_spin):
+        trained_net(_image, config['infsteps'], istrain=False)
+        if i+1 % 5 == 0:
+            for l in range(len(trained_net.architecture)):
+                is_train.append(0)
+                layer.append(l)
+                r_act.append(trained_net.states['r_activation'][l].cpu().numpy())
+                r_out.append(trained_net.states['r_output'][l].cpu().numpy())
+                e_out.append(trained_net.states['error'][l].cpu().numpy())
+            trained_net.init_states()
 
 df_reps = pd.DataFrame()
 

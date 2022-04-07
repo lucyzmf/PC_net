@@ -128,15 +128,16 @@ r_act = []
 r_out = []
 e_out = []
 
-for i, (_image, _label) in enumerate(train_loader_spin):
-    trained_net(_image, config['infsteps'], istrain=True)
-    if i+1 % 5 == 0:
-        for l in range(len(trained_net.architecture)):
-            is_train.append(1)
-            layer.append(l)
-            r_act.append(trained_net.states['r_activation'][l].numpy())
-            r_out.append(trained_net.states['r_output'][l].numpy())
-            e_out.append(trained_net.states['error'][l].numpy())
+with torch.no_grad:
+    for i, (_image, _label) in enumerate(train_loader_spin):
+        trained_net(_image, config['infsteps'], istrain=True)
+        if i+1 % 5 == 0:
+            for l in range(len(trained_net.architecture)):
+                is_train.append(1)
+                layer.append(l)
+                r_act.append(trained_net.states['r_activation'][l].numpy())
+                r_out.append(trained_net.states['r_output'][l].numpy())
+                e_out.append(trained_net.states['error'][l].numpy())
 
 print(len(is_train))
 

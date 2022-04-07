@@ -10,8 +10,6 @@ import seaborn as sns
 import yaml
 from sklearn.manifold import TSNE
 from torch.autograd import Variable
-from torch.utils import data
-from torch.utils.data import DataLoader
 
 from evaluation import *
 from fc_net import FcDHPC
@@ -31,7 +29,7 @@ def load_config(config_name):
 
 config = load_config("config.yaml")
 
-file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/2022-03-18 16:35:47.941832')
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs')
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
@@ -57,12 +55,30 @@ class LogisticRegression(torch.nn.Module):
 
 # %%
 #  load the training set used during training
-train_loader = torch.load(os.path.join(file_path, 'train_loader.pth'))
-test_loader = torch.load(os.path.join(file_path, 'test_loader.pth'))
+train_loader_spin = torch.load(os.path.join(file_path, 'fashionMNISTtrain_loader_spin.pth'))
+test_loader_spin = torch.load(os.path.join(file_path, 'fashionMNISTtest_loader_spin.pth'))
+
+# %%
+train_seq_spin, train_labels_spin = [], []
+for i, (_frame, _label) in enumerate(train_loader_spin):
+    train_seq_spin.append(torch.flatten(_frame).data.numpy())
+    train_labels_spin.append(_label.data)
+
+train_seq_spin = np.vstack(train_seq_spin)
+train_labels_spin = torch.concat(train_labels_spin).numpy()
+
+# %%
+test_seq_spin, test_labels_spin = [], []
+for i, (_frame, _label) in enumerate(test_loader_spin):
+    test_seq_spin.append(torch.flatten(_frame).data.numpy())
+    test_labels_spin.append(_label.data)
+
+test_seq_spin = np.vstack(test_seq_spin)
+test_labels_spin = torch.concat(test_labels_spin).numpy()
 
 # %%
 
-dataWidth = 28  # width of mnist
+dataWidth = 28 + 2*config['padding_size']  # width of mnist + padding
 numClass = 10  # number of classes in mnist
 
 # %%
@@ -88,7 +104,7 @@ elif config['architecture'] == 'RfDHPC_cm':
     trained_net = RfDHPC_cm(config['network_size'], config['rf_sizes'], config['infrates'] * 2, lr=config['learning_rate'],
                             act_func=config['act_func'],
                             device=device, dtype=dtype)
-trained_net.load_state_dict(torch.load(glob.glob(file_path + '/*/*readout.pth')[0], map_location=torch.device('cpu')))
+trained_net.load_state_dict(torch.load(glob.glob(file_path + '/reset_per_frame_false/trained_model/*readout.pth')[0], map_location=torch.device('cpu')))
 trained_net.eval()
 
 # %%
@@ -100,7 +116,7 @@ for i in range(len(arch) - 1):
     axs[i].set_title('layer' + str(i))
 
 plt.show()
-fig.savefig(os.path.join(file_path, 'weight_dist'))
+fig.savefig(os.path.join(file_path + '/reset_per_frame_false/', 'weight_dist'))
 
 # %%
 # code from online
@@ -110,28 +126,44 @@ optimizer = torch.optim.SGD(classifier.parameters(), lr=.001)
 classifier.to(device)
 
 # %%
-# generate representations using train and test images
+# create dataframe of representations using train and test images
+# TODO classification acc on r from all layers
+'''this is testing the network that is trained with seq '''
 
 print('generate high level representations used for training and testing classifier')
-cat_mem = torch.zeros(arch[-1]).to(device)
+# create data frame that has columns: is_train, layers, r_act, r_out, e_out, reset at the end of each sequence
 
-train_x = []  # contains last layer representations learned from training data
-train_y = []  # contains labels in training data
-for i, (_image, _label) in enumerate(train_loader):
-    train_x.append(high_level_rep(trained_net, torch.flatten(_image), 500))
-    train_y.append(_label)
-train_x, train_y = torch.stack(train_x), torch.cat(train_y)
-dataset = data.TensorDataset(train_x, train_y)
-train_loader_rep = DataLoader(dataset, shuffle=True)
+is_train = []
+layer = []
+r_act = []
+r_out = []
+e_out = []
 
-test_x = []  # contains last layer representations learned from testing data
-test_y = []  # contains labels in training data
-for i, (_image, _label) in enumerate(test_loader):
-    test_x.append(high_level_rep(trained_net, torch.flatten(_image), 500))
-    test_y.append(_label)
-test_x, test_y = torch.stack(test_x), torch.cat(test_y)
-dataset = data.TensorDataset(test_x, test_y)
-test_loader_rep = DataLoader(dataset, shuffle=True)
+for i, (_image, _label) in enumerate(train_loader_spin):
+    trained_net(_image, config['infsteps'], istrain=True)
+    if i+1 % 5 == 0:
+        for l in range(len(trained_net.architecture)):
+            is_train.append(1)
+            layer.append(l)
+            r_act.append(trained_net.states['r_activation'][l].numpy())
+            r_out.append(trained_net.states['r_output'][l].numpy())
+            e_out.append(trained_net.states['error'][l].numpy())
+
+print(len(is_train))
+
+# %%
+# generate representations from test spin loader
+for i, (_image, _label) in enumerate(test_loader_spin):
+    trained_net(_image, config['infsteps'], istrain=True)
+    if i+1 % 5 == 0:
+        for l in range(len(trained_net.architecture)):
+            is_train.append(0)
+            layer.append(l)
+            r_act.append(trained_net.states['r_activation'][l].numpy())
+            r_out.append(trained_net.states['r_output'][l].numpy())
+            e_out.append(trained_net.states['error'][l].numpy())
+        trained_net.init_states()
+
 
 # %%
 # train and test classifier

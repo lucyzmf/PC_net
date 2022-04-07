@@ -43,8 +43,10 @@ num_classes = 10
 
 # %%
 # load images
-train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
-test_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
+# train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
+# test_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
+train_set = torch.load('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs/fashionMNISTtrain_image.pt')
+test_set = torch.load('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs/fashionMNISTtest_image.pt')
 
 # %%
 train_indices = train_set.indices
@@ -164,15 +166,18 @@ sns.scatterplot(
 
 plt.title('tSNE clustering baseline on fashionMNIST images ')
 plt.show()
-fig.savefig(os.path.join(config['dataset_dir'], 'tSNE_clustering_rep'))
+# fig.savefig(os.path.join(config['dataset_dir'], 'tSNE_clustering_rep'))
+fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'tSNE_clustering_rep'))
 
 # %%
 ######################
 # classification of sequence training images
 ######################
 
-train_set_spin = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader_spin.pth'))
-test_set_spin = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_loader_spin.pth'))
+# train_set_spin = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader_spin.pth'))
+# test_set_spin = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_loader_spin.pth'))
+train_set_spin = torch.load('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs/fashionMNISTtrain_loader_spin.pth')
+test_set_spin = torch.load('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs/fashionMNISTtest_loader_spin.pth')
 
 # %%
 train_seq_spin, train_labels_spin = [], []
@@ -257,15 +262,16 @@ im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)
 ax.set_title('RDM cosine of train and test images (sorted by class within each dataset)')
 plt.show()
-fig.savefig(os.path.join(config['dataset_dir'], 'RDM coscience of train images'))
+# fig.savefig(os.path.join(config['dataset_dir'], 'RDM coscience of train images'))
+fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of train images'))
 
 # %%
 # rdm of train sequences
-train_loader_seq = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader_spin.pth'))
+# train_loader_seq = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader_spin.pth'))
 seq_frames = []
 seq_labels = []
 plotting = []
-for i, (_image, _label) in enumerate(train_loader_seq):
+for i, (_image, _label) in enumerate(train_set_spin):
     seq_frames.append(torch.flatten(torch.squeeze(_image)).numpy())
     plotting.append(torch.squeeze(_image).numpy())
     seq_labels.append(_label)
@@ -282,7 +288,9 @@ fig, axs = plt.subplots(1, 5, sharex=True)
 for i in range(5):
     axs[i].imshow(plotting[i])
 plt.show()
-fig.savefig(os.path.join(config['dataset_dir'], 'example sequence in training set'))
+# fig.savefig(os.path.join(config['dataset_dir'], 'example sequence in training set'))
+fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'example sequence in training set'))
+
 
 
 # %%
@@ -294,7 +302,9 @@ im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)
 ax.set_title('RDM cosine of frames one sequence in training set')
 # plt.show()
-fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one sequence in training set'))
+# fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one sequence in training set'))
+fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of frames of one sequence in training set'))
+
 
 # %%
 # rdm of a class of sequence
@@ -304,7 +314,8 @@ im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)
 ax.set_title('RDM cosine of frames one class in training set')
 # plt.show()
-fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one class in training set'))
+# fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one class in training set'))
+fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of frames one class in training set'))
 
 
 # %%
@@ -315,4 +326,5 @@ im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)
 ax.set_title('RDM cosine of frames all classes in training set')
 # plt.show()
-fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames all classes in training set'))
+# fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames all classes in training set'))
+fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of frames all classes in training set'))

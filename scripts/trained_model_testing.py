@@ -122,7 +122,7 @@ trained_net.eval()
 print('generate high level representations used for training and testing classifier')
 # create data frame that has columns: is_train, layers, r_act, r_out, e_out, reset at the end of each sequence
 
-is_train = []
+is_train = []  # whether rep is generated from training set
 layer = []
 r_act = []
 r_out = []

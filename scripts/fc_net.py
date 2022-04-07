@@ -90,8 +90,8 @@ class FCLayer(nn.Module):
     def w_update(self, e_act, nextlayer_output, reg_constant=reg_strength, r_type=reg_type):
         # compute update and average across batch dim
         update = torch.bmm(e_act, torch.transpose(nextlayer_output, 1, 2))
-        # update = torch.mean(update, dim=0)
-        update = torch.sum(update, dim=0)
+        update = torch.mean(update, dim=0)
+        # update = torch.sum(update, dim=0)
         # select reg type
         if r_type == 'l1':
             reg_matrix = -torch.sign(torch.clone(self.weights))

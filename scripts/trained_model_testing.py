@@ -104,22 +104,15 @@ trained_net.load_state_dict(torch.load(glob.glob(file_path + '/reset_per_frame_f
 trained_net.eval()
 
 # %%
-# distribution of trained weights
-
-fig, axs = plt.subplots(1, len(arch) - 1, figsize=(12, 4))
-for i in range(len(arch) - 1):
-    axs[i].hist(trained_net.layers[i].weights)
-    axs[i].set_title('layer' + str(i))
-
-plt.show()
-fig.savefig(os.path.join(file_path + '/reset_per_frame_false/', 'weight_dist'))
-
-# %%
-# code from online
-classifier = LogisticRegression(arch[-1], 10)
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(classifier.parameters(), lr=.001)
-classifier.to(device)
+# # distribution of trained weights
+#
+# fig, axs = plt.subplots(1, len(arch) - 1, figsize=(12, 4))
+# for i in range(len(arch) - 1):
+#     axs[i].hist(trained_net.layers[i].weights)
+#     axs[i].set_title('layer' + str(i))
+#
+# plt.show()
+# fig.savefig(os.path.join(file_path + '/reset_per_frame_false/', 'weight_dist'))
 
 # %%
 # create dataframe of representations using train and test images

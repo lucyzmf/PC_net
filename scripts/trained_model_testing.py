@@ -149,9 +149,9 @@ for i, (_image, _label) in enumerate(test_loader_spin):
         for l in range(len(trained_net.architecture)):
             is_train.append(0)
             layer.append(l)
-            r_act.append(trained_net.states['r_activation'][l].numpy())
-            r_out.append(trained_net.states['r_output'][l].numpy())
-            e_out.append(trained_net.states['error'][l].numpy())
+            r_act.append(trained_net.states['r_activation'][l].cpu().numpy())
+            r_out.append(trained_net.states['r_output'][l].cpu().numpy())
+            e_out.append(trained_net.states['error'][l].cpu().numpy())
         trained_net.init_states()
 
 df_reps = pd.DataFrame()

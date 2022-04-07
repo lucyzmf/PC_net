@@ -133,6 +133,7 @@ with torch.no_grad():
     for i, (_image, _label) in enumerate(train_loader_spin):
         trained_net(_image, config['infsteps'], istrain=False)
         if i+1 % 5 == 0:
+            print('1 seq done', len(is_train))
             for l in range(len(trained_net.architecture)):
                 is_train.append(1)
                 layer.append(l)
@@ -140,6 +141,7 @@ with torch.no_grad():
                 r_out.append(trained_net.states['r_output'][l].cpu().numpy())
                 e_out.append(trained_net.states['error'][l].cpu().numpy())
                 labels.append(_label.cpu().numpy())
+            trained_net.init_states()
 
 print(len(is_train))
 
@@ -149,6 +151,7 @@ with torch.no_grad():
     for i, (_image, _label) in enumerate(test_loader_spin):
         trained_net(_image, config['infsteps'], istrain=False)
         if i+1 % 5 == 0:
+            print('1 seq done', len(is_train))
             for l in range(len(trained_net.architecture)):
                 is_train.append(0)
                 layer.append(l)

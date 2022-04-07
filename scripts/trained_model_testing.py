@@ -128,7 +128,7 @@ r_act = []
 r_out = []
 e_out = []
 
-with torch.no_grad:
+with torch.no_grad():
     for i, (_image, _label) in enumerate(train_loader_spin):
         trained_net(_image, config['infsteps'], istrain=True)
         if i+1 % 5 == 0:

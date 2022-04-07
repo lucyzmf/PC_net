@@ -25,7 +25,7 @@ def load_config(config_name):
 
 config = load_config("config.yaml")
 
-file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs')
+file_path = os.path.abspath('../results/80_epochs')
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
@@ -168,7 +168,7 @@ df_reps['r_out'] = r_out
 df_reps['r_act'] = r_act
 df_reps['e_act'] = e_out
 
-df_reps.to_csv('../results')
+df_reps.to_csv('../results/reps_df_reset_per_frame_false')
 
 
 # %%

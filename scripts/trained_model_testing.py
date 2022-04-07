@@ -25,14 +25,15 @@ def load_config(config_name):
 
 config = load_config("config.yaml")
 
-file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs')
 
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
     print("Cuda is available")
+    file_path = '../results/80_epochs'
 else:
     dev = "cpu"
     print("Cuda not available")
+    file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs')
 device = torch.device(dev)
 
 dtype = torch.float  # Set standard datatype

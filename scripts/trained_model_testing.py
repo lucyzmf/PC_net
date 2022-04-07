@@ -3,13 +3,9 @@ This script evalute trained models
 '''
 import glob
 import os
-import time
 
-import pandas
-import seaborn as sns
+import pandas as pd
 import yaml
-from sklearn.manifold import TSNE
-from torch.autograd import Variable
 
 from evaluation import *
 from fc_net import FcDHPC
@@ -164,77 +160,56 @@ for i, (_image, _label) in enumerate(test_loader_spin):
             e_out.append(trained_net.states['error'][l].numpy())
         trained_net.init_states()
 
+df_reps = pd.DataFrame()
 
-# %%
-# train and test classifier
+df_reps['is_train'] = is_train
+df_reps['layer'] = layer
+df_reps['r_out'] = r_out
+df_reps['r_act'] = r_act
+df_reps['e_act'] = e_out
 
-epochs = 200
-iter = 0
-for epoch in range(int(epochs)):
-    for i, (images, labels) in enumerate(train_loader_rep):
-        images = Variable(images.view(-1, arch[-1]))
-        labels = Variable(labels)
+df_reps.to_csv('../results')
 
-        optimizer.zero_grad()
-        outputs = classifier(images)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-
-        iter += 1
-        if iter % 500 == 0:
-            # calculate Accuracy
-            correct = 0
-            total = 0
-            for i, (_images, _labels) in enumerate(test_loader_rep):
-                _images = Variable(_images.view(-1, arch[-1]))
-                outputs = classifier(_images)
-                _, predicted = torch.max(outputs.data, 1)
-                total += _labels.size(0)
-                # for gpu, bring the predicted and labels back to cpu fro python operations to work
-                correct += (predicted == _labels).sum()
-            accuracy = 100 * correct / total
-            print("Iteration: {}. Loss: {}. Accuracy: {}.".format(iter, loss.item(), accuracy))
 
 # %%
 # tSNE clustering
-print('tSNE clustering')
-time_start = time.time()
-tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=1000)
-tsne_results = tsne.fit_transform(train_x)
-print('t-SNE done! Time elapsed: {} seconds'.format(time.time() - time_start))
+# print('tSNE clustering')
+# time_start = time.time()
+# tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=1000)
+# tsne_results = tsne.fit_transform(train_x)
+# print('t-SNE done! Time elapsed: {} seconds'.format(time.time() - time_start))
+#
+# # %%
+# # visualisation
+# df = pandas.DataFrame()
+# df['tsne-one'] = tsne_results[:, 0]
+# df['tsne-two'] = tsne_results[:, 1]
+# df['y'] = train_y
+# fig, ax1 = plt.subplots(figsize=(10, 8))
+# sns.scatterplot(
+#     x="tsne-one", y="tsne-two",
+#     hue="y",
+#     palette=sns.color_palette("bright", 10),
+#     data=df,
+#     legend="full",
+#     alpha=0.3,
+#     ax=ax1
+# )
+#
+# plt.show()
+# fig.savefig(os.path.join(file_path, 'tSNE_clustering_rep'))
 
 # %%
-# visualisation
-df = pandas.DataFrame()
-df['tsne-one'] = tsne_results[:, 0]
-df['tsne-two'] = tsne_results[:, 1]
-df['y'] = train_y
-fig, ax1 = plt.subplots(figsize=(10, 8))
-sns.scatterplot(
-    x="tsne-one", y="tsne-two",
-    hue="y",
-    palette=sns.color_palette("bright", 10),
-    data=df,
-    legend="full",
-    alpha=0.3,
-    ax=ax1
-)
-
-plt.show()
-fig.savefig(os.path.join(file_path, 'tSNE_clustering_rep'))
-
-# %%
-# sort representations by class first before passing to rdm function
-train_indices = np.argsort(train_y)
-train_x = train_x[train_indices]
-
-test_indices = np.argsort(test_y)
-test_x = test_x[test_indices]
-
-rdm_train = rdm_w_rep(train_x, 'cosine', istrain=True)
-rdm_train.savefig(os.path.join(file_path, 'rdm_train.png'))
-rdm_test = rdm_w_rep(test_x, 'cosine', istrain=False)
-rdm_test.savefig(os.path.join(file_path, 'rdm_test.png'))
+# # sort representations by class first before passing to rdm function
+# train_indices = np.argsort(train_y)
+# train_x = train_x[train_indices]
+#
+# test_indices = np.argsort(test_y)
+# test_x = test_x[test_indices]
+#
+# rdm_train = rdm_w_rep(train_x, 'cosine', istrain=True)
+# rdm_train.savefig(os.path.join(file_path, 'rdm_train.png'))
+# rdm_test = rdm_w_rep(test_x, 'cosine', istrain=False)
+# rdm_test.savefig(os.path.join(file_path, 'rdm_test.png'))
 
 # %%

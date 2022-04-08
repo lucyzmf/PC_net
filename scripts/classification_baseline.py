@@ -328,3 +328,5 @@ ax.set_title('RDM cosine of frames all classes in training set')
 # plt.show()
 # fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames all classes in training set'))
 fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of frames all classes in training set'))
+
+# %%

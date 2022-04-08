@@ -188,3 +188,15 @@ def rdm_w_rep(representations, metric_type, istrain):
     plt.show()
 
     return fig
+
+# %%
+def rdm_w_rep_title(representations, metric_type, title):
+    pair_dist_cosine = pairwise_distances(representations, metric=metric_type)
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(pair_dist_cosine)
+    fig.colorbar(im, ax=ax)
+    ax.set_title(title)
+    plt.show()
+
+    return fig

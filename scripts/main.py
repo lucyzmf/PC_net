@@ -25,7 +25,7 @@ now = datetime.datetime.now()
 # load config
 CONFIG_PATH = "../scripts/"
 
-test_name = 'morph_test_6_'
+test_name = 'morph_test_6_4layer'
 
 def load_config(config_name):
     with open(os.path.join(CONFIG_PATH, config_name)) as file:
@@ -198,7 +198,7 @@ if __name__ == '__main__':
                 errors.append(net.total_error())
 
                 if (i+1) % 5 == 0:  # log at the end of each sequence
-                    last_layer_act.append(torch.mean(net.states['r_activation'][-1].detach().cpu()))
+                    last_layer_act.append(torch.mean(net.states['r_output'][-1].detach().cpu()))
                     wandb.log({
                         'last layer activation distribution': wandb.Histogram(
                             net.states['r_activation'][-1].detach().cpu()),
@@ -212,13 +212,13 @@ if __name__ == '__main__':
 
                 if (seq_train and not reset_per_frame) and ((i+1) % frame_per_seq == 0):  # if trained on sequences and reps taken at the end of seq
                     if (epoch % 10 == 0) or (epoch == epochs-1):
-                        rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
+                        rep_train.append(net.states['r_output'][-1].detach().cpu().numpy())
                         label_train.append(label)
                     net.init_states()
 
                 if not seq_train or (seq_train and reset_per_frame):  # if trained on still images or seq train but reset per frame
                     if (epoch % 10 == 0) or (epoch == epochs - 1):
-                        rep_train.append(net.states['r_activation'][-1].detach().cpu().numpy())
+                        rep_train.append(net.states['r_output'][-1].detach().cpu().numpy())
                         label_train.append(label)
                     net.init_states()
 
@@ -246,7 +246,7 @@ if __name__ == '__main__':
                     net.init_states()
                     net(_image, inference_steps, istrain=False)
                     errors_test.append(net.total_error())
-                    rep_still_test.append(net.states['r_activation'][-1].detach().cpu().numpy())
+                    rep_still_test.append(net.states['r_output'][-1].detach().cpu().numpy())
                     rep_still_labels.append(_label)
 
                 # log errors
@@ -290,7 +290,7 @@ if __name__ == '__main__':
                     for i, (_image, _label) in enumerate(test_loader):  # generate high level rep using spin seq test dataset
                         net(_image, inference_steps, istrain=False)
                         if (i + 1) % frame_per_seq == 0:  # at the end of each sequence
-                            seq_rep_test.append(net.states['r_activation'][-1].detach().cpu().numpy())  # rep recorded at end of each seq
+                            seq_rep_test.append(net.states['r_output'][-1].detach().cpu().numpy())  # rep recorded at end of each seq
                             seq_label_test.append(_label)
                             net.init_states()
                     # convert arrays

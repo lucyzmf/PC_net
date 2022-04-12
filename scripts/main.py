@@ -72,6 +72,10 @@ if __name__ == '__main__':
     norm_constant = config['norm_constant']
     reset_per_frame = config['reset_per_frame']
 
+    # set up test name
+    test_name = 'morph_test_7' + str(reset_per_frame)
+    print(test_name)
+
     # load data
     if seq_train:
         train_loader = torch.load(

@@ -29,7 +29,7 @@ if torch.cuda.is_available():  # Use GPU if possible
 else:
     dev = "cpu"
     print("Cuda not available")
-    file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_7')
+    file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs')
 device = torch.device(dev)
 
 dtype = torch.float  # Set standard datatype
@@ -99,13 +99,13 @@ elif config['architecture'] == 'RfDHPC_cm':
                             device=device, dtype=dtype)
 
 trained_net.load_state_dict(
-    torch.load(glob.glob(file_path + '/100epoch_l2.1/*readout.pth')[0],
+    torch.load(glob.glob(file_path + '/reset_per_frame_true/trained_model/*readout.pth')[0],
                map_location=torch.device('cpu')))
 
 # %%
 # inspect convergence of last layer
 image = train_seq_spin[0]
-inf_step = np.arange(0, 60000)
+inf_step = np.arange(0, 50000)
 high_layer_output = []
 mid_layer_output = []
 input_layer_output = []

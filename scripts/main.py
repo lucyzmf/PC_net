@@ -26,6 +26,7 @@ now = datetime.datetime.now()
 CONFIG_PATH = "../scripts/"
 
 test_name = 'morph_test_7'
+print(test_name)
 
 def load_config(config_name):
     with open(os.path.join(CONFIG_PATH, config_name)) as file:
@@ -151,8 +152,9 @@ if __name__ == '__main__':
         total_errors = []
         total_errors_test = []
         last_layer_act_log = []
-        train_acc_history = []
+        clustering_acc = []
         test_acc_history = []  # acc on test set at the end of each epoch
+        best_gen_acc = 0
 
         # sample image and label to test reconstruction
         for test_images, test_labels in test_still_img_loader:
@@ -265,6 +267,7 @@ if __name__ == '__main__':
 
                 # assess clustering
                 within_sample_acc = within_sample_classification_stratified(rep_train, label_train)
+                clustering_acc.append(within_sample_acc)
                 print('clustering: linear regression on high level reps from train set (stratified kfold) %.4f'
                       % within_sample_acc)
                 wandb.log({
@@ -301,6 +304,12 @@ if __name__ == '__main__':
                     # linear regression
                     acc_train, acc_test = linear_regression(rep_train, label_train, seq_rep_test, seq_label_test)
                     print('epoch: %i: generalisation, seq rep to seq rep linear regression test acc %.4f' % (epoch, acc_test))
+                    if acc_test > best_gen_acc:  # save best gen acc model
+                        best_gen_acc = acc_test
+                        torch.save(net.state_dict(),
+                                   trained_model_dir + str(config['morph_type']) + str(net.architecture) +
+                                   str(net.inf_rates) + str(seq_train) + str(reg_type) + '_' + str(reg_strength) +
+                                   str(wbconfig.update_per_frame) + 'updates_per_frame_acc' + str(best_gen_acc) + 'readout.pth')
 
                     # knn classification on train and test sequence
                     _, cum_acc_knn = knn_classifier(rep_train, label_train, seq_rep_test, seq_label_test)
@@ -322,10 +331,7 @@ if __name__ == '__main__':
 
                 # save trained models
                 if epoch == epochs - 1:
-                    print('end training, saving trained model')
-                    torch.save(net.state_dict(), trained_model_dir + str(config['morph_type']) + str(net.architecture) +
-                               str(net.inf_rates) + str(seq_train) + str(reg_type) + '_' + str(reg_strength) +
-                               str(wbconfig.update_per_frame) + 'updates_per_frame' + 'readout.pth')
+                    print('end training')
 
 
         # %%
@@ -358,7 +364,7 @@ if __name__ == '__main__':
 
         # %%
         fig, axs = plt.subplots(2, 3, figsize=(24, 10))
-        w_0_1 = net.layers[0].weights
+        w_0_1 = net.layers[0].weights.detach().cpu()
         bu_error_to_hidden = np.matmul(torch.transpose(w_0_1, 0, 1).numpy(), np.transpose(np.vstack(error_intput)))
 
         axs[0][0].plot(inf_step, (np.transpose(bu_error_to_hidden) - error_mid))
@@ -377,10 +383,27 @@ if __name__ == '__main__':
         axs[1][1].set_title('hidden layer MSE')
 
         # plot bu_error - e_act to layer 2
-        w_1_2 = net.layers[1].weights
+        w_1_2 = net.layers[1].detach().weights.cpu()
         bu_error_hidden_to_last = np.matmul(torch.transpose(w_1_2, 0, 1).numpy(), np.transpose(np.vstack(error_mid)))
         axs[1][2].plot(inf_step, (np.transpose(bu_error_hidden_to_last)))
         axs[1][2].set_title('amount of update to last layer')
 
         plt.show()
-        plt.savefig(trained_model_dir + '/convergence.png')
+        plt.savefig(os.path.join(trained_model_dir, 'convergence.png'))
+
+        # %%
+        fig, axs = plt.subplots()
+        print('total errors', total_errors)
+        plt.plot(np.arange(len(total_errors)), total_errors)
+        plt.title('total MSE in network during training')
+        plt.savefig(os.path.join(trained_model_dir, 'total_error.png'))
+
+        # %%
+        print('clustering acc', clustering_acc)
+        fig, axs = plt.subplots()
+        plt.plot(np.arange(len(clustering_acc)), clustering_acc)
+        plt.title('clustering acc during training')
+        plt.savefig(os.path.join(trained_model_dir, 'cluster_acc.png'))
+
+        # %%
+

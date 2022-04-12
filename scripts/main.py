@@ -337,4 +337,23 @@ if __name__ == '__main__':
         _, _, fig_test = generate_rdm(net, test_still_img_loader, inference_steps * 5)
         wandb.log({'rdm still image test data': wandb.Image(fig_test)})
 
+        # %%
+        # inspect convergence of last layer
+        image, _ = train_loader[0]
+        inf_step = np.arange(0, 2000)
+        high_layer_output = []
+        error = []
 
+        net.init_states()
+        for i in inf_step:
+            net(image, 1, istrain=False)
+            high_layer_output.append(net.states['r_output'][-1].detach().cpu().numpy())
+            error.append(net.states['error'][-2].detach().cpu().numpy())
+
+        fig, axs = plt.subplots(1, 2, figsize=(12, 5))
+        axs[0].plot(inf_step, high_layer_output)
+        axs[0].set_title('output')
+        axs[1].plot(inf_step, error)
+        axs[1].set_title('error')
+        # plt.show()
+        plt.savefig(trained_model_dir + 'last layer convergence.png')

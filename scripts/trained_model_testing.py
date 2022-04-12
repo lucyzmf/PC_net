@@ -473,6 +473,8 @@ for container in ax.containers:
 plt.title('still to still generalisation: acc by layer')
 # plt.show()
 plt.savefig(os.path.join(file_path, 'still to still generalisation: acc by layer.png'))
+
+
 # %%
 # tSNE clustering
 # print('tSNE clustering')

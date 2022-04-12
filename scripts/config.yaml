@@ -10,7 +10,7 @@ num_workers: 2
 padding_size: 5
 
 # network hyperparameters
-epochs: 60
+epochs: 1
 infsteps: 100
 infrates: [.01, .01, .01, .01]
 network_size: [1444, 2000, 100, 50]

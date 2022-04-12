@@ -339,21 +339,48 @@ if __name__ == '__main__':
 
         # %%
         # inspect convergence of last layer
-        image, _ = train_loader[0]
-        inf_step = np.arange(0, 2000)
+        inf_step = np.arange(0, 100000)
         high_layer_output = []
-        error = []
+        mid_layer_output = []
+        input_layer_output = []
+        error_intput = []
+        error_mid = []
 
         net.init_states()
         for i in inf_step:
-            net(image, 1, istrain=False)
+            net(sample_image, 1, istrain=False)
             high_layer_output.append(net.states['r_output'][-1].detach().cpu().numpy())
-            error.append(net.states['error'][-2].detach().cpu().numpy())
+            mid_layer_output.append(net.states['r_output'][-2].detach().cpu().numpy())
+            input_layer_output.append(net.states['r_output'][0].detach().cpu().numpy())
 
-        fig, axs = plt.subplots(1, 2, figsize=(12, 5))
-        axs[0].plot(inf_step, high_layer_output)
-        axs[0].set_title('output')
-        axs[1].plot(inf_step, error)
-        axs[1].set_title('error')
-        # plt.show()
-        plt.savefig(trained_model_dir + 'last layer convergence.png')
+            error_intput.append(net.states['error'][0].detach().cpu().numpy())
+            error_mid.append(net.states['error'][-2].detach().cpu().numpy())
+
+        # %%
+        fig, axs = plt.subplots(2, 3, figsize=(24, 10))
+        w_0_1 = net.layers[0].weights
+        bu_error_to_hidden = np.matmul(torch.transpose(w_0_1, 0, 1).numpy(), np.transpose(np.vstack(error_intput)))
+
+        axs[0][0].plot(inf_step, (np.transpose(bu_error_to_hidden) - error_mid))
+        axs[0][0].set_title('amount of update to hidden layer')
+        axs[0][1].plot(inf_step, mid_layer_output)
+        axs[0][1].set_title('hidden layer output')
+        axs[0][2].plot(inf_step, high_layer_output)
+        axs[0][2].set_title('highest layer output')
+
+        mse_input = np.mean(np.vstack(error_intput), axis=1) ** 2
+        mse_mid = np.mean(np.vstack(error_mid), axis=1) ** 2
+
+        axs[1][0].plot(inf_step, mse_input)
+        axs[1][0].set_title('input layer MSE')
+        axs[1][1].plot(inf_step, mse_mid)
+        axs[1][1].set_title('hidden layer MSE')
+
+        # plot bu_error - e_act to layer 2
+        w_1_2 = net.layers[1].weights
+        bu_error_hidden_to_last = np.matmul(torch.transpose(w_1_2, 0, 1).numpy(), np.transpose(np.vstack(error_mid)))
+        axs[1][2].plot(inf_step, (np.transpose(bu_error_hidden_to_last)))
+        axs[1][2].set_title('amount of update to last layer')
+
+        plt.show()
+        plt.savefig(trained_model_dir + '/convergence.png')

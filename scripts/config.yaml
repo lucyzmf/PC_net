@@ -10,7 +10,7 @@ num_workers: 2
 padding_size: 5
 
 # network hyperparameters
-epochs: 100
+epochs: 80
 infsteps: 100
 infrates: [.01, .01, .01, .01]
 network_size: [1444, 2000, 100]
@@ -24,10 +24,10 @@ rf_sizes: [5, 9, 15]
 
 # used to generate morphing dataset
 frame_per_sequence: 5
-seq_train: False  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
+seq_train: True  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
 reset_per_frame: False
 morph_type: spin
-reg_strength: 1
+reg_strength: .1
 reg_type: l2
 infstep_before_update: 20
 act_norm: False

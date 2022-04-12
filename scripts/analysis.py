@@ -1,3 +1,4 @@
+import glob
 import os
 
 import yaml
@@ -28,7 +29,7 @@ if torch.cuda.is_available():  # Use GPU if possible
 else:
     dev = "cpu"
     print("Cuda not available")
-    file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs')
+    file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_7')
 device = torch.device(dev)
 
 dtype = torch.float  # Set standard datatype
@@ -87,73 +88,65 @@ arch_type = config['architecture']
 #  network instantiation
 per_im_repeat = 1
 
-# trained_net = DHPC(network_architecture, inf_rates, lr=lr, act_func=sigmoid, device=device, dtype=dtype)
 if config['architecture'] == 'FcDHPC':
-    trained_net_true = FcDHPC(config['network_size'], config['infrates']*10, lr=config['learning_rate'],
+    trained_net = FcDHPC(config['network_size'], config['infrates']*10, lr=config['learning_rate'],
                               act_func=config['act_func'],
                               device=device, dtype=dtype)
-    trained_net_false = FcDHPC(config['network_size'], config['infrates']*10, lr=config['learning_rate'],
-                               act_func=config['act_func'],
-                               device=device, dtype=dtype)
 elif config['architecture'] == 'RfDHPC_cm':
     trained_net = RfDHPC_cm(config['network_size'], config['rf_sizes'], config['infrates'] * 4,
                             lr=config['learning_rate'],
                             act_func=config['act_func'],
                             device=device, dtype=dtype)
 
+trained_net.load_state_dict(
+    torch.load(glob.glob(file_path + '/100epoch_l2.1/*readout.pth')[0],
+               map_location=torch.device('cpu')))
+
 # %%
 # inspect convergence of last layer
 image = train_seq_spin[0]
-inf_step = np.arange(0, 100000)
+inf_step = np.arange(0, 60000)
 high_layer_output = []
 mid_layer_output = []
 input_layer_output = []
 error_intput = []
 error_mid = []
 
-trained_net_false.init_states()
+trained_net.init_states()
 for i in inf_step:
-    trained_net_false(torch.tensor(image), 1, istrain=False)
-    high_layer_output.append(trained_net_false.states['r_output'][-1].detach().cpu().numpy())
-    mid_layer_output.append(trained_net_false.states['r_output'][-2].detach().cpu().numpy())
-    input_layer_output.append(trained_net_false.states['r_output'][0].detach().cpu().numpy())
+    trained_net(torch.tensor(image), 1, istrain=False)
+    high_layer_output.append(trained_net.states['r_output'][-1].detach().cpu().numpy())
+    mid_layer_output.append(trained_net.states['r_output'][-2].detach().cpu().numpy())
+    input_layer_output.append(trained_net.states['r_output'][0].detach().cpu().numpy())
 
-    error_intput.append(trained_net_false.states['error'][0].detach().cpu().numpy())
-    error_mid.append(trained_net_false.states['error'][-2].detach().cpu().numpy())
+    error_intput.append(trained_net.states['error'][0].detach().cpu().numpy())
+    error_mid.append(trained_net.states['error'][-2].detach().cpu().numpy())
 
 # %%
-fig, axs = plt.subplots(2, 3, figsize=(12, 5))
-axs[0][0].plot(inf_step, input_layer_output)
-axs[0][0].set_title('input layer output')
+fig, axs = plt.subplots(2, 3, figsize=(24, 10))
+w_0_1 = trained_net.layers[0].weights
+bu_error_to_hidden = np.matmul(torch.transpose(w_0_1, 0, 1).numpy(), np.transpose(np.vstack(error_intput)))
+
+axs[0][0].plot(inf_step, (np.transpose(bu_error_to_hidden) - error_mid))
+axs[0][0].set_title('amount of update to hidden layer')
 axs[0][1].plot(inf_step, mid_layer_output)
 axs[0][1].set_title('hidden layer output')
 axs[0][2].plot(inf_step, high_layer_output)
 axs[0][2].set_title('highest layer output')
 
-
-mse_input = np.mean(np.vstack(error_intput), axis=1)**2
-mse_mid = np.mean(np.vstack(error_mid), axis=1)**2
+mse_input = np.mean(np.vstack(error_intput), axis=1) ** 2
+mse_mid = np.mean(np.vstack(error_mid), axis=1) ** 2
 
 axs[1][0].plot(inf_step, mse_input)
 axs[1][0].set_title('input layer MSE')
 axs[1][1].plot(inf_step, mse_mid)
 axs[1][1].set_title('hidden layer MSE')
 
-plt.show()
-# %%
-# plot bu_error - e_act to layer 1
-w_0_1 = trained_net_false.layers[0].weights
-bu_error_to_hidden = np.matmul(torch.transpose(w_0_1, 0, 1).numpy(), np.transpose(np.vstack(error_intput)))
-# %%
-plt.plot(inf_step, (np.transpose(bu_error_to_hidden) - error_mid))
-plt.title('amount of update to hidden layer')
-plt.show()
-
-# %%
 # plot bu_error - e_act to layer 2
-w_1_2 = trained_net_false.layers[1].weights
+w_1_2 = trained_net.layers[1].weights
 bu_error_hidden_to_last = np.matmul(torch.transpose(w_1_2, 0, 1).numpy(), np.transpose(np.vstack(error_mid)))
-# %%
-plt.plot(inf_step, (np.transpose(bu_error_hidden_to_last)))
-plt.title('amount of update to last layer')
+axs[1][2].plot(inf_step, (np.transpose(bu_error_hidden_to_last)))
+axs[1][2].set_title('amount of update to last layer')
+
 plt.show()
+# plt.savefig(trained_model_dir + '/convergence.png')

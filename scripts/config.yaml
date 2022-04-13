@@ -20,7 +20,9 @@ per_seq_repeat: 1
 
 # network architecture: FcDHPC,RfDHPC_cm
 architecture: FcDHPC
-rf_sizes: [5, 9, 15]
+rf_sizes: [5, 7, 9]
+stride: 1
+n_channels: [32, 64, 128]
 
 # used to generate morphing dataset
 frame_per_sequence: 5
@@ -29,6 +31,6 @@ reset_per_frame: False
 morph_type: spin
 reg_strength: .01
 reg_type: l2
-infstep_before_update: 20
+infstep_before_update: 25
 act_norm: False
 norm_constant: .0001

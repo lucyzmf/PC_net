@@ -368,7 +368,7 @@ if __name__ == '__main__':
 
         # %%
         fig, axs = plt.subplots(2, 3, figsize=(24, 10))
-        w_0_1 = net.layers[0].weights.detach().cpu()
+        w_0_1 = net.layers[0].weights.cpu()
         bu_error_to_hidden = np.matmul(torch.transpose(w_0_1, 0, 1).numpy(), np.transpose(np.vstack(error_intput)))
 
         axs[0][0].plot(inf_step, (np.transpose(bu_error_to_hidden) - error_mid))
@@ -387,7 +387,7 @@ if __name__ == '__main__':
         axs[1][1].set_title('hidden layer MSE')
 
         # plot bu_error - e_act to layer 2
-        w_1_2 = net.layers[1].detach().weights.cpu()
+        w_1_2 = net.layers[1].weights.cpu()
         bu_error_hidden_to_last = np.matmul(torch.transpose(w_1_2, 0, 1).numpy(), np.transpose(np.vstack(error_mid)))
         axs[1][2].plot(inf_step, (np.transpose(bu_error_hidden_to_last)))
         axs[1][2].set_title('amount of update to last layer')

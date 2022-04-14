@@ -25,7 +25,7 @@ now = datetime.datetime.now()
 # load config
 CONFIG_PATH = "../scripts/"
 
-test_name = 'morph_test_7'
+test_name = 'morph_test_8'
 print(test_name)
 
 def load_config(config_name):
@@ -114,7 +114,7 @@ if __name__ == '__main__':
         dataWidth = 28 + 2*config['padding_size']
 
         # Hyperparameters for training logged with wandb
-        wandb.init(project="DHPC_morph_test_7", entity="lucyzmf")  # , mode='disabled')
+        wandb.init(project="DHPC_morph_test_8", entity="lucyzmf")  # , mode='disabled')
 
         wbconfig = wandb.config
         wbconfig.infstep = inference_steps

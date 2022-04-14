@@ -27,10 +27,10 @@ n_channels: [32, 64, 128]
 # used to generate morphing dataset
 frame_per_sequence: 5
 seq_train: True  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
-reset_per_frame: False
+reset_per_frame: True
 morph_type: spin
 reg_strength: .01
 reg_type: l2
-infstep_before_update: 25
+infstep_before_update: 20
 act_norm: False
 norm_constant: .0001

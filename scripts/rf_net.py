@@ -79,6 +79,7 @@ class RfLayer(nn.Module):
         # prediction: w_l, r_out_l+1
         # inference: e_l (y_l-pred), w_l-1, e_l-1, return updated e, r_act, r_out
 
+        # TODO top down need to resolve overlap,
         e_act = r_out - torch.bmm(self.weights,
                                   nextlayer_r_out)  # The activity of error neurons is representation - prediction.
         # pass e_act through activation function
@@ -110,8 +111,9 @@ class RfLayer(nn.Module):
 class input_layer(RfLayer):
     # Additional class for the input layer. This layer does not use a full inference step (driven only by input).
     def forward(self, inputs, nextlayer_r_out):
-        r_act =
         top_down_projection = torch.bmm(self.weights, nextlayer_r_out)
+        # TODO when compute top down projection,
+        # compute the actual prediction given overlapping rfs
         inputs = inputs.repeat(self.channel_sz, 1, 1)  # repeat input image(2d) in first dim with channel size
         e_act = inputs.to(self.device) - top_down_projection
         # pass e_act through tanh

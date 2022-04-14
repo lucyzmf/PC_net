@@ -16,7 +16,7 @@ import os
 import numpy as np
 import torch.profiler
 import datetime
-from rf_net_cm import RfDHPC_cm
+from rf_net_cm_scratch import RfDHPC_cm
 from torch import nn
 from torch.utils import data
 

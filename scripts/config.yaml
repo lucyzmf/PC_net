@@ -2,8 +2,8 @@
 dataset_dir: ../data/datasets
 # MNIST, fashionMNIST
 dataset_type: fashionMNIST
-train_size: 30
-test_size: 5
+train_size: 10
+test_size: 3
 pin_mem: True
 batch_size: 1
 num_workers: 2
@@ -11,7 +11,7 @@ padding_size: 5
 
 # network hyperparameters
 epochs: 40
-infsteps: 100
+infsteps: 150
 infrates: [.01, .01, .01, .01]
 network_size: [1444, 2000, 100]
 learning_rate: .001
@@ -25,11 +25,11 @@ stride: 1
 n_channels: [32, 64, 128]
 
 # used to generate morphing dataset
-frame_per_sequence: 5
+frame_per_sequence: 9
 seq_train: True  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
 reset_per_frame: True
 morph_type: spin
-reg_strength: .1
+reg_strength: .01
 reg_type: l2
 infstep_before_update: 20
 act_norm: False

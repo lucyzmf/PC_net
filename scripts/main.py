@@ -1,4 +1,6 @@
 # %%
+import pickle
+
 import wandb
 
 wandb.login(key='25f10546ef384a6f1ab9446b42d7513024dea001')
@@ -24,10 +26,6 @@ now = datetime.datetime.now()
 
 # load config
 CONFIG_PATH = "../scripts/"
-
-test_name = 'morph_test_8'
-print(test_name)
-
 
 def load_config(config_name):
     with open(os.path.join(CONFIG_PATH, config_name)) as file:
@@ -77,7 +75,7 @@ if __name__ == '__main__':
     reset_per_frame = config['reset_per_frame']
 
     # set up test name
-    test_name = 'morph_test_7' + str(reset_per_frame)
+    test_name = 'morph_test_8_reset' + str(reset_per_frame) + '_seqtrain' + str(seq_train)
     print(test_name)
 
     # load train data
@@ -372,7 +370,7 @@ if __name__ == '__main__':
 
         # %%
         # inspect convergence of last layer
-        inf_step = np.arange(0, 100000)
+        inf_step = np.arange(0, 20000)
         high_layer_output = []
         mid_layer_output = []
         input_layer_output = []
@@ -419,6 +417,9 @@ if __name__ == '__main__':
         plt.savefig(os.path.join(trained_model_dir, 'convergence.png'))
 
         # %%
+        # save important datapoints for later plotting
+        log = {'total_error': total_errors}
+
         fig, axs = plt.subplots()
         print('total errors', total_errors)
         plt.plot(np.arange(len(total_errors)), total_errors)
@@ -426,6 +427,8 @@ if __name__ == '__main__':
         plt.savefig(os.path.join(trained_model_dir, 'total_error.png'))
 
         # %%
+        log['clustering acc'] = clustering_acc
+
         print('clustering acc', clustering_acc)
         fig, axs = plt.subplots()
         plt.plot(np.arange(len(clustering_acc)), clustering_acc)
@@ -433,3 +436,5 @@ if __name__ == '__main__':
         plt.savefig(os.path.join(trained_model_dir, 'cluster_acc.png'))
 
         # %%
+        with open(trained_model_dir + test_name + 'training_metrics_log.pkl', 'wb') as f:
+            pickle.dump(log, f)

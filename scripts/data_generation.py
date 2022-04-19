@@ -32,9 +32,6 @@ dataset = config['dataset_type']
 train_size = config['train_size']  # training dataset size
 test_size = config['test_size']  # test dataset size
 frames_per_sequence = config['frame_per_sequence']
-pin_mem = config['pin_mem']
-batchSize = config['batch_size']
-n_workers = config['num_workers']
 padding = config['padding_size']
 data_width = 28 + padding * 2
 num_classes = 10
@@ -135,12 +132,12 @@ test_y = torch.flatten(test_y.repeat(1, frames_per_sequence))
 # %%
 # save spin dataset to correct directory
 train_set_spin = data.TensorDataset(train_x, train_y)
-train_loader_spin = data.DataLoader(train_set_spin, batch_size=batchSize, num_workers=n_workers, pin_memory=pin_mem)
+# train_loader_spin = data.DataLoader(train_set_spin, batch_size=batchSize, num_workers=n_workers, pin_memory=pin_mem)
 test_set_spin = data.TensorDataset(test_x, test_y)
-test_loader_spin = data.DataLoader(test_set_spin, batch_size=batchSize, num_workers=n_workers, pin_memory=pin_mem)
+# test_loader_spin = data.DataLoader(test_set_spin, batch_size=batchSize, num_workers=n_workers, pin_memory=pin_mem)
 
-torch.save(train_loader_spin, os.path.join(data_dir, str(dataset) + 'train_loader_spin.pth'))
-torch.save(test_loader_spin, os.path.join(data_dir, str(dataset) + 'test_loader_spin.pth'))
+torch.save(train_set_spin, os.path.join(data_dir, str(dataset) + 'train_set_spin.pt'))
+torch.save(test_set_spin, os.path.join(data_dir, str(dataset) + 'test_set_spin.pt'))
 
 # %%
 # save log of stimuli rotation type and direction to csv

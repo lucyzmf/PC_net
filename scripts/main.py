@@ -28,6 +28,7 @@ CONFIG_PATH = "../scripts/"
 test_name = 'morph_test_8'
 print(test_name)
 
+
 def load_config(config_name):
     with open(os.path.join(CONFIG_PATH, config_name)) as file:
         config = yaml.safe_load(file)
@@ -52,8 +53,11 @@ if __name__ == '__main__':
 
     dtype = torch.float  # Set standard datatype
 
-    # git config values
+    # get config values
     dataset = config['dataset_type']
+    pin_mem = config['pin_mem']
+    batchSize = config['batch_size']
+    n_workers = config['num_workers']
     inference_steps = config['infsteps']  # num infsteps per image
     epochs = config['epochs']  # total training epochs
     infrates = config['infrates']  # inf rates each layer
@@ -76,10 +80,16 @@ if __name__ == '__main__':
     test_name = 'morph_test_7' + str(reset_per_frame)
     print(test_name)
 
-    # load data
+    # load train data
     if seq_train:
-        train_loader = torch.load(
-            os.path.join(config['dataset_dir'], str(dataset) + 'train_loader_' + str(morph_type) + '.pth'))
+        train_set = torch.load(
+            os.path.join(config['dataset_dir'], str(dataset) + 'train_set_' + str(morph_type) + '.pth'))
+        if reset_per_frame:  # if reset per frame, shuffle spin dataset
+            train_loader = data.DataLoader(train_set, batch_size=batchSize, num_workers=n_workers,
+                                           pin_memory=pin_mem, shuffle=True)
+        else:
+            train_loader = data.DataLoader(train_set, batch_size=batchSize, num_workers=n_workers,
+                                           pin_memory=pin_mem, shuffle=False)
     else:
         train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
         train_indices = train_set.indices
@@ -88,11 +98,17 @@ if __name__ == '__main__':
         train_labels_still = train_set.dataset.targets[train_indices]
         train_still_img_dataset = data.TensorDataset(train_img_still, train_labels_still)
         train_loader = data.DataLoader(train_still_img_dataset, batch_size=config['batch_size'],
-                                                 num_workers=config['num_workers'], pin_memory=config['pin_mem'], shuffle=True)
+                                       num_workers=config['num_workers'], pin_memory=config['pin_mem'], shuffle=True)
 
-
-    test_loader = torch.load(
-        os.path.join(config['dataset_dir'], str(dataset) + 'test_loader_' + str(morph_type) + '.pth'))
+    # load test data
+    test_set = torch.load(
+        os.path.join(config['dataset_dir'], str(dataset) + 'test_set_' + str(morph_type) + '.pt'))
+    if reset_per_frame:
+        test_loader = data.DataLoader(train_set, batch_size=batchSize, num_workers=n_workers,
+                                      pin_memory=pin_mem, shuffle=True)
+    else:
+        test_loader = data.DataLoader(train_set, batch_size=batchSize, num_workers=n_workers,
+                                      pin_memory=pin_mem, shuffle=False)
 
     # load test still images
     test_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
@@ -102,7 +118,8 @@ if __name__ == '__main__':
     test_labels_still = test_set.dataset.targets[test_indices]
     still_img_dataset = data.TensorDataset(test_img_still, test_labels_still)
     test_still_img_loader = data.DataLoader(still_img_dataset, batch_size=config['batch_size'],
-                                            num_workers=config['num_workers'], pin_memory=config['pin_mem'], shuffle=True)
+                                            num_workers=config['num_workers'], pin_memory=config['pin_mem'],
+                                            shuffle=True)
 
     # %%
     ###########################
@@ -111,7 +128,7 @@ if __name__ == '__main__':
     with torch.no_grad():  # turn off auto grad function
         # meta data on MNIST dataset
         numClass = 10
-        dataWidth = 28 + 2*config['padding_size']
+        dataWidth = 28 + 2 * config['padding_size']
 
         # Hyperparameters for training logged with wandb
         wandb.init(project="DHPC_morph_test_8", entity="lucyzmf")  # , mode='disabled')
@@ -203,7 +220,7 @@ if __name__ == '__main__':
                 net.learn()
                 errors.append(net.total_error())
 
-                if (i+1) % 5 == 0:  # log at the end of each sequence
+                if (i + 1) % 5 == 0:  # log at the end of each sequence
                     last_layer_act.append(torch.mean(net.states['r_output'][-1].detach().cpu()))
                     wandb.log({
                         'last layer activation distribution': wandb.Histogram(
@@ -216,13 +233,15 @@ if __name__ == '__main__':
                         'layer 0 error activation': wandb.Histogram(net.states['error'][0].detach().cpu())
                     })
 
-                if (seq_train and not reset_per_frame) and ((i+1) % frame_per_seq == 0):  # if trained on sequences and reps taken at the end of seq
-                    if (epoch % 10 == 0) or (epoch == epochs-1):
+                if (seq_train and not reset_per_frame) and (
+                        (i + 1) % frame_per_seq == 0):  # if trained on sequences and reps taken at the end of seq
+                    if (epoch % 10 == 0) or (epoch == epochs - 1):
                         rep_train.append(net.states['r_output'][-1].detach().cpu().numpy())
                         label_train.append(label)
                     net.init_states()
 
-                if not seq_train or (seq_train and reset_per_frame):  # if trained on still images or seq train but reset per frame
+                if not seq_train or (
+                        seq_train and reset_per_frame):  # if trained on still images or seq train but reset per frame
                     if (epoch % 10 == 0) or (epoch == epochs - 1):
                         rep_train.append(net.states['r_output'][-1].detach().cpu().numpy())
                         label_train.append(label)
@@ -238,7 +257,7 @@ if __name__ == '__main__':
                 'avg last layer act': last_layer_act_log[-1]
             })
 
-            if (epoch % 10 == 0) or (epoch == epochs-1):  # evaluation every 10 epochs
+            if (epoch % 10 == 0) or (epoch == epochs - 1):  # evaluation every 10 epochs
                 # organise reps logged during training
                 rep_train = np.vstack(rep_train)
                 label_train = torch.concat(label_train).numpy()
@@ -248,7 +267,8 @@ if __name__ == '__main__':
                 rep_still_labels = []
                 net.init_states()
 
-                for i, (_image, _label) in enumerate(test_still_img_loader):  # iterate through still image loader to generate reps
+                for i, (_image, _label) in enumerate(
+                        test_still_img_loader):  # iterate through still image loader to generate reps
                     net.init_states()
                     net(_image, inference_steps, istrain=False)
                     errors_test.append(net.total_error())
@@ -294,10 +314,12 @@ if __name__ == '__main__':
 
                 if seq_train:
                     net.init_states()
-                    for i, (_image, _label) in enumerate(test_loader):  # generate high level rep using spin seq test dataset
+                    for i, (_image, _label) in enumerate(
+                            test_loader):  # generate high level rep using spin seq test dataset
                         net(_image, inference_steps, istrain=False)
                         if (i + 1) % frame_per_seq == 0:  # at the end of each sequence
-                            seq_rep_test.append(net.states['r_output'][-1].detach().cpu().numpy())  # rep recorded at end of each seq
+                            seq_rep_test.append(
+                                net.states['r_output'][-1].detach().cpu().numpy())  # rep recorded at end of each seq
                             seq_label_test.append(_label)
                             net.init_states()
                     # convert arrays
@@ -307,13 +329,15 @@ if __name__ == '__main__':
                     # assess generalisation using all seq reps , use two types of classifiers
                     # linear regression
                     acc_train, acc_test = linear_regression(rep_train, label_train, seq_rep_test, seq_label_test)
-                    print('epoch: %i: generalisation, seq rep to seq rep linear regression test acc %.4f' % (epoch, acc_test))
+                    print('epoch: %i: generalisation, seq rep to seq rep linear regression test acc %.4f' % (
+                        epoch, acc_test))
                     if acc_test > best_gen_acc:  # save best gen acc model
                         best_gen_acc = acc_test
                         torch.save(net.state_dict(),
                                    trained_model_dir + str(config['morph_type']) + str(net.architecture) +
                                    str(net.inf_rates) + str(seq_train) + str(reg_type) + '_' + str(reg_strength) +
-                                   str(wbconfig.update_per_frame) + 'updates_per_frame_acc' + str(best_gen_acc) + 'readout.pth')
+                                   str(wbconfig.update_per_frame) + 'updates_per_frame_acc' + str(
+                                       best_gen_acc) + 'readout.pth')
 
                     # knn classification on train and test sequence
                     _, cum_acc_knn = knn_classifier(rep_train, label_train, seq_rep_test, seq_label_test)
@@ -336,7 +360,6 @@ if __name__ == '__main__':
                 # save trained models
                 if epoch == epochs - 1:
                     print('end training')
-
 
         # %%
         _, _, fig_train = generate_rdm(net, train_loader, inference_steps * 5)
@@ -410,4 +433,3 @@ if __name__ == '__main__':
         plt.savefig(os.path.join(trained_model_dir, 'cluster_acc.png'))
 
         # %%
-

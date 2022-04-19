@@ -81,7 +81,7 @@ if __name__ == '__main__':
     # load train data
     if seq_train:
         train_set = torch.load(
-            os.path.join(config['dataset_dir'], str(dataset) + 'train_set_' + str(morph_type) + '.pth'))
+            os.path.join(config['dataset_dir'], str(dataset) + 'train_set_' + str(morph_type) + '.pt'))
         if reset_per_frame:  # if reset per frame, shuffle spin dataset
             train_loader = data.DataLoader(train_set, batch_size=batchSize, num_workers=n_workers,
                                            pin_memory=pin_mem, shuffle=True)

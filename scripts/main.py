@@ -255,7 +255,7 @@ if __name__ == '__main__':
                 'avg last layer act': last_layer_act_log[-1]
             })
 
-            if (epoch+1) % 5 == 0:  # evaluation every 5 epochs
+            if (epoch % 10 == 0) or (epoch == epochs - 1):  # evaluation every 5 epochs
                 # organise reps logged during training
                 rep_train = np.vstack(rep_train)
                 label_train = torch.concat(label_train).numpy()

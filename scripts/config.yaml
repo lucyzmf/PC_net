@@ -11,7 +11,7 @@ padding_size: 5
 
 # network hyperparameters
 epochs: 20
-infsteps: 150
+infsteps: 200
 infrates: [.01, .01, .01, .01]
 network_size: [1444, 2000, 100]
 learning_rate: .001
@@ -31,6 +31,6 @@ reset_per_frame: True
 morph_type: spin
 reg_strength: .01
 reg_type: l2
-infstep_before_update: 25
+infstep_before_update: 5
 act_norm: False
 norm_constant: .0001

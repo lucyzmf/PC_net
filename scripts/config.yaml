@@ -2,8 +2,8 @@
 dataset_dir: ../data/datasets
 # MNIST, fashionMNIST
 dataset_type: fashionMNIST
-train_size: 5
-test_size: 2
+train_size: 180
+test_size: 40
 pin_mem: True
 batch_size: 1
 num_workers: 2

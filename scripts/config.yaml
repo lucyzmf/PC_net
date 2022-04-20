@@ -31,6 +31,6 @@ reset_per_frame: False
 morph_type: spin
 reg_strength: .01
 reg_type: l2
-infstep_before_update: 5
+infstep_before_update: 25
 act_norm: False
 norm_constant: .0001

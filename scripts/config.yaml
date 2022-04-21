@@ -32,5 +32,5 @@ morph_type: spin
 reg_strength: .01
 reg_type: l2
 infstep_before_update: 25
-act_norm: False
-norm_constant: .0001
+act_norm: True
+norm_constant: .000001

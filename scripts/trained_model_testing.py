@@ -3,16 +3,18 @@ This script evalute trained models
 '''
 import glob
 import os
+import time
 
 import pandas as pd
 import seaborn as sns
 import yaml
+from sklearn.manifold import TSNE
 from torch import nn
 from torch.utils import data
 
 from evaluation import *
 from fc_net import FcDHPC
-from rf_net_cm import RfDHPC_cm
+from rf_net_cm_scratch import RfDHPC_cm
 
 # TODO change representation generation function since on trained dataset it should be representations generated from sequences
 
@@ -35,7 +37,8 @@ if torch.cuda.is_available():  # Use GPU if possible
 else:
     dev = "cpu"
     print("Cuda not available")
-    file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs')
+    file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_8/test 2/')
+    dataDir = '/data 5stillperclass/'
 device = torch.device(dev)
 
 dtype = torch.float  # Set standard datatype
@@ -54,26 +57,31 @@ class LogisticRegression(torch.nn.Module):
 
 # %%
 #  load the training set used during training
-train_loader_spin = torch.load(os.path.join(file_path, 'fashionMNISTtrain_loader_spin.pth'))
-test_loader_spin = torch.load(os.path.join(file_path, 'fashionMNISTtest_loader_spin.pth'))
+train_set_spin = torch.load(os.path.join(file_path + dataDir, 'fashionMNISTtrain_set_spin.pt'))
+trainLoaderSpin = data.DataLoader(train_set_spin, batch_size=config['batch_size'], num_workers=config['num_workers'],
+                                  pin_memory=config['pin_mem'], shuffle=False)
+test_set_spin = torch.load(os.path.join(file_path + dataDir, 'fashionMNISTtest_set_spin.pt'))
+testLoaderSpin = data.DataLoader(test_set_spin, batch_size=config['batch_size'], num_workers=config['num_workers'],
+                                 pin_memory=config['pin_mem'], shuffle=False)
+
+
+# %%
+def turn_tensordataset_to_np(seq_list, labels_list, dataloader):
+    for i, (_frame, _label) in enumerate(dataloader):
+        seq_list.append(torch.flatten(_frame).data.numpy())
+        labels_list.append(_label.data)
+
+    seq_list = np.vstack(seq_list)
+    labels_list = torch.concat(labels_list).numpy()
+
+    return seq_list, labels_list
 
 # %%
 train_seq_spin, train_labels_spin = [], []
-for i, (_frame, _label) in enumerate(train_loader_spin):
-    train_seq_spin.append(torch.flatten(_frame).data.numpy())
-    train_labels_spin.append(_label.data)
-
-train_seq_spin = np.vstack(train_seq_spin)
-train_labels_spin = torch.concat(train_labels_spin).numpy()
-
-# %%
 test_seq_spin, test_labels_spin = [], []
-for i, (_frame, _label) in enumerate(test_loader_spin):
-    test_seq_spin.append(torch.flatten(_frame).data.numpy())
-    test_labels_spin.append(_label.data)
 
-test_seq_spin = np.vstack(test_seq_spin)
-test_labels_spin = torch.concat(test_labels_spin).numpy()
+train_seq_spin, train_labels_spin = turn_tensordataset_to_np(train_seq_spin, train_labels_spin, trainLoaderSpin)
+test_seq_spin, test_labels_spin = turn_tensordataset_to_np(test_seq_spin, test_labels_spin, testLoaderSpin)
 
 # %%
 
@@ -83,7 +91,7 @@ numClass = 10  # number of classes in mnist
 # %%
 # load trained model
 # Hyperparameters used during training
-inference_steps = config['infsteps']  # num infsteps per image
+inference_steps = config['infsteps']  # num infsteps per image during testing
 epochs = config['epochs']  # total training epochs
 infrates = config['infrates']  # inf rates each layer
 lr = config['learning_rate']  # lr for weight updates
@@ -103,7 +111,7 @@ if config['architecture'] == 'FcDHPC':
                                act_func=config['act_func'],
                                device=device, dtype=dtype)
 elif config['architecture'] == 'RfDHPC_cm':
-    trained_net = RfDHPC_cm(config['network_size'], config['rf_sizes'], config['infrates'] * 4,
+    trained_net = RfDHPC_cm(config['network_size'], config['rf_sizes'], config['infrates'],
                             lr=config['learning_rate'],
                             act_func=config['act_func'],
                             device=device, dtype=dtype)
@@ -126,12 +134,14 @@ elif config['architecture'] == 'RfDHPC_cm':
 print('generate representations')
 # create data frame that has columns: is_train, layers, r_act, r_out, e_out, reset at the end of each sequence
 trained_net_false.load_state_dict(
-    torch.load(glob.glob(file_path + '/reset_per_frame_false/trained_model/*readout.pth')[0],
+    torch.load(glob.glob(file_path + '/6 train_size5_8updatesmorph_test_8_resetFalse_seqtrainTrue2022-04-20 '
+                                     '16:58:32.794805/**/*readout.pth')[2],
                map_location=torch.device('cpu')))
 trained_net_false.eval()
 
 trained_net_true.load_state_dict(
-    torch.load(glob.glob(file_path + '/reset_per_frame_true/trained_model/*readout.pth')[0],
+    torch.load(glob.glob(file_path + '/2 train_size5_40updatesmorph_test_8_resetTrue_seqtrainTrue2022-04-20 '
+                                     '10:18:06.770530/**/*readout.pth')[0],
                map_location=torch.device('cpu')))
 trained_net_true.eval()
 
@@ -142,26 +152,27 @@ seq_r_act_f, seq_r_act_t = [], []
 seq_r_out_f, seq_r_out_t = [], []
 seq_e_out_f, seq_e_out_t = [], []
 
-
 labels = []
 
 df_seq_f, df_seq_t = pd.DataFrame(), pd.DataFrame()
 
-dataloaders = [train_loader_spin, test_loader_spin]
+dataloaders = [trainLoaderSpin, testLoaderSpin]
 
 ##############################################################
 # generate sequence representations
 ##############################################################
 
 with torch.no_grad():
+    trained_net_true.init_states()
+    trained_net_false.init_states()
     for loader in range(len(dataloaders)):
         print(len(dataloaders[loader]))
         tr = 1 if loader == 0 else 0  # log whether rep is generated from train or test set
         for i, (_image, _label) in enumerate(dataloaders[loader]):
             # print(i)
-            trained_net_true.forward(_image, config['infsteps'], istrain=False)
-            trained_net_false(_image, config['infsteps'], istrain=False)
-            if (i + 1) % 5 == 0:  # at the end of eqch sequence
+            trained_net_true(_image, inference_steps, istrain=False)
+            trained_net_false(_image, inference_steps, istrain=False)
+            if (i + 1) % config['frame_per_sequence'] == 0:  # at the end of eqch sequence
                 for l in range(len(trained_net_false.architecture)):
                     is_train.append(tr)
                     layer.append(l)
@@ -181,7 +192,7 @@ with torch.no_grad():
                         seq_e_out_f.append(trained_net_false.states['error'][l].detach().cpu().numpy())
                         seq_e_out_t.append(trained_net_true.states['error'][l].detach().cpu().numpy())
 
-                print('%i seqs done' % ((i + 1) / 5), len(is_train))
+                print('%i seqs done' % ((i + 1) / 9), len(is_train))
                 trained_net_false.init_states()
                 trained_net_true.init_states()
 
@@ -216,13 +227,15 @@ frame_r_out_f, frame_r_out_t = [], []
 frame_e_out_f, frame_e_out_t = [], []
 
 with torch.no_grad():
+    trained_net_true.init_states()
+    trained_net_false.init_states()
     for loader in range(len(dataloaders)):
         print(len(dataloaders[loader]))
         tr = 1 if loader == 0 else 0  # log whether rep is generated from train or test set
         for i, (_image, _label) in enumerate(dataloaders[loader]):
             # print(i)
-            trained_net_true.forward(_image, config['infsteps'], istrain=False)
-            trained_net_false(_image, config['infsteps'], istrain=False)
+            trained_net_true.forward(_image, inference_steps, istrain=False)
+            trained_net_false(_image, inference_steps, istrain=False)
             # for every frame
             for l in range(len(trained_net_false.architecture)):
                 is_train_frame.append(tr)
@@ -284,13 +297,13 @@ by_layer = []
 
 
 def get_layer_acc(dataframe, _layer):
-    _, acc = linear_regression(
+    _, acc = knn_classifier(
         np.vstack(dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['r_out'].to_numpy()),
         dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['labels'].to_numpy(),
         np.vstack(dataframe[dataframe['is_train'] == 0][dataframe['layer'] == _layer][
                       'r_out'].to_numpy()),
         dataframe[dataframe['is_train'] == 0][dataframe['layer'] == _layer]['labels'].to_numpy()
-        )
+    )
     return acc
 
 
@@ -320,7 +333,7 @@ plt.title('seq to seq generalisation: acc by layer')
 # plt.show()
 plt.savefig(os.path.join(file_path, 'seq to seq generalisation: acc by layer.png'))
 
- # %%
+  # %%
 # frame to frame
 frame_to_frame_acc = []
 reset_per_frame = []
@@ -356,12 +369,11 @@ plt.savefig(os.path.join(file_path, 'frame to frame generalisation: acc by layer
 df_still_f = pd.DataFrame()
 df_still_t = pd.DataFrame()
 
-
 # %%
 # testing on still img
 # load images
-train_set = torch.load(os.path.join(file_path, 'fashionMNISTtrain_image.pt'))
-test_set = torch.load(os.path.join(file_path, 'fashionMNISTtest_image.pt'))
+train_set = torch.load(os.path.join(file_path + dataDir, 'fashionMNISTtrain_image.pt'))
+test_set = torch.load(os.path.join(file_path + dataDir, 'fashionMNISTtest_image.pt'))
 # train_set = torch.load('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs/fashionMNISTtrain_image.pt')
 # test_set = torch.load('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs/fashionMNISTtest_image.pt')
 
@@ -397,37 +409,39 @@ still_r_out_f, still_r_out_t = [], []
 still_e_out_f, still_e_out_t = [], []
 
 dataloaders = [train_still_loader, test_still_loader]
-for loader in range(len(dataloaders)):
-    print(len(dataloaders[loader]))
-    tr = 1 if loader == 0 else 0
-    for i, (_image, _label) in enumerate(dataloaders[loader]):
-        trained_net_true.forward(_image, config['infsteps'], istrain=False)
-        trained_net_false(_image, config['infsteps'], istrain=False)
-        # for every frame
-        for l in range(len(trained_net_false.architecture)):
-            is_train_still.append(tr)
-            layer_still.append(l)
-            labels_still.append(int(_label.cpu().numpy()))
-            # reps from false net
-            still_r_act_f.append(trained_net_false.states['r_activation'][l].detach().cpu().numpy())
-            still_r_out_f.append(trained_net_false.states['r_output'][l].detach().cpu().numpy())
-
-            # reps from true net
-            still_r_act_t.append(trained_net_true.states['r_activation'][l].detach().cpu().numpy())
-            still_r_out_t.append(trained_net_true.states['r_output'][l].detach().cpu().numpy())
-
-            if l == (len(trained_net_false.architecture) - 1):
-                still_e_out_f.append(np.zeros(trained_net_false.layers[l].layer_size))
-                still_e_out_t.append(np.zeros(trained_net_true.layers[l].layer_size))
-            else:
-                still_e_out_f.append(trained_net_false.states['error'][l].detach().cpu().numpy())
-                still_e_out_t.append(trained_net_true.states['error'][l].detach().cpu().numpy())
-
-        if i % 20 == 0:
-            print('%i img done' % i)
-        trained_net_false.init_states()
+with torch.no_grad():
+    for loader in range(len(dataloaders)):
         trained_net_true.init_states()
+        trained_net_false.init_states()
+        print(len(dataloaders[loader]))
+        tr = 1 if loader == 0 else 0
+        for i, (_image, _label) in enumerate(dataloaders[loader]):
+            trained_net_true.forward(_image, inference_steps, istrain=False)
+            trained_net_false(_image, inference_steps, istrain=False)
+            # for every frame
+            for l in range(len(trained_net_false.architecture)):
+                is_train_still.append(tr)
+                layer_still.append(l)
+                labels_still.append(int(_label.cpu().numpy()))
+                # reps from false net
+                still_r_act_f.append(trained_net_false.states['r_activation'][l].detach().cpu().numpy())
+                still_r_out_f.append(trained_net_false.states['r_output'][l].detach().cpu().numpy())
 
+                # reps from true net
+                still_r_act_t.append(trained_net_true.states['r_activation'][l].detach().cpu().numpy())
+                still_r_out_t.append(trained_net_true.states['r_output'][l].detach().cpu().numpy())
+
+                if l == (len(trained_net_false.architecture) - 1):
+                    still_e_out_f.append(np.zeros(trained_net_false.layers[l].layer_size))
+                    still_e_out_t.append(np.zeros(trained_net_true.layers[l].layer_size))
+                else:
+                    still_e_out_f.append(trained_net_false.states['error'][l].detach().cpu().numpy())
+                    still_e_out_t.append(trained_net_true.states['error'][l].detach().cpu().numpy())
+
+            if i % 20 == 0:
+                print('%i img done' % i)
+            trained_net_false.init_states()
+            trained_net_true.init_states()
 
 # %%
 df_still_f['is_train'] = is_train_still
@@ -474,46 +488,103 @@ plt.title('still to still generalisation: acc by layer')
 # plt.show()
 plt.savefig(os.path.join(file_path, 'still to still generalisation: acc by layer.png'))
 
+# %%
+cum_acc = within_sample_classification_stratified(np.vstack(df_seq_t[df_seq_t['is_train']==0][df_seq_t['layer']==2]['r_out'].to_numpy()),
+                                                  df_seq_t[df_seq_t['is_train']==0][df_seq_t['layer']==2]['labels'].to_numpy())
+print(cum_acc)
+
+# %%
+acc1, acc2 = linear_regression(np.vstack(df_seq_f[df_seq_f['is_train']==1][df_seq_f['layer']==2]['r_out'].to_numpy()),
+                           df_seq_f[df_seq_f['is_train']==1][df_seq_f['layer']==2]['labels'].to_numpy(),
+                           np.vstack(df_seq_f[df_seq_f['is_train'] == 0][df_seq_f['layer'] == 2]['r_out'].to_numpy()),
+                           df_seq_f[df_seq_f['is_train'] == 0][df_seq_f['layer'] == 2]['labels'].to_numpy()
+                           )
+print(acc1, acc2)
+# %%
+acc1, acc2 = linear_regression(np.vstack(df_frame_t[df_frame_t['is_train']==1][df_frame_t['layer']==2]['r_out'].to_numpy()),
+                           df_frame_t[df_frame_t['is_train']==1][df_frame_t['layer']==2]['labels'].to_numpy(),
+                           np.vstack(df_frame_t[df_frame_t['is_train'] == 0][df_frame_t['layer'] == 2]['r_out'].to_numpy()),
+                           df_frame_t[df_frame_t['is_train'] == 0][df_frame_t['layer'] == 2]['labels'].to_numpy()
+                           )
+print(acc1, acc2)
 
 # %%
 # tSNE clustering
-# print('tSNE clustering')
-# time_start = time.time()
-# tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=1000)
-# tsne_results = tsne.fit_transform(train_x)
-# print('t-SNE done! Time elapsed: {} seconds'.format(time.time() - time_start))
-#
-# # %%
-# # visualisation
-# df = pandas.DataFrame()
-# df['tsne-one'] = tsne_results[:, 0]
-# df['tsne-two'] = tsne_results[:, 1]
-# df['y'] = train_y
-# fig, ax1 = plt.subplots(figsize=(10, 8))
-# sns.scatterplot(
-#     x="tsne-one", y="tsne-two",
-#     hue="y",
-#     palette=sns.color_palette("bright", 10),
-#     data=df,
-#     legend="full",
-#     alpha=0.3,
-#     ax=ax1
-# )
-#
-# plt.show()
+
+def plot_tsne(reps, labels):
+    print('tSNE clustering')
+    time_start = time.time()
+    tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=1000)
+    tsne_results = tsne.fit_transform(np.vstack(reps))
+    print('t-SNE done! Time elapsed: {} seconds'.format(time.time() - time_start))
+    #
+    # # %%
+    # # visualisation
+    df = pd.DataFrame()
+    df['tsne-one'] = tsne_results[:, 0]
+    df['tsne-two'] = tsne_results[:, 1]
+    df['y'] = labels
+    fig, ax1 = plt.subplots(figsize=(10, 8))
+    sns.scatterplot(
+        x="tsne-one", y="tsne-two",
+        hue="y",
+        palette=sns.color_palette("bright", 10),
+        data=df,
+        legend="full",
+        alpha=0.3,
+        ax=ax1
+    )
+
+    plt.show()
 # fig.savefig(os.path.join(file_path, 'tSNE_clustering_rep'))
 
 # %%
-# # sort representations by class first before passing to rdm function
-# train_indices = np.argsort(train_y)
-# train_x = train_x[train_indices]
-#
-# test_indices = np.argsort(test_y)
-# test_x = test_x[test_indices]
-#
-# rdm_train = rdm_w_rep(train_x, 'cosine', istrain=True)
-# rdm_train.savefig(os.path.join(file_path, 'rdm_train.png'))
-# rdm_test = rdm_w_rep(test_x, 'cosine', istrain=False)
-# rdm_test.savefig(os.path.join(file_path, 'rdm_test.png'))
+plot_tsne(df_seq_f[df_seq_f['is_train']==1][df_seq_f['layer']==2]['r_out'].to_numpy(), df_seq_f[df_seq_f['is_train']==1][df_seq_f['layer']==2]['labels'].to_numpy())
 
 # %%
+highest_level_rep_f = np.vstack(df_seq_f[df_seq_f['layer']==2]['r_out'].to_numpy())
+labels_f = df_seq_f[df_seq_f['layer']==2]['labels'].to_numpy()
+highest_level_rep_t = np.vstack(df_frame_t[df_frame_t['layer']==2]['r_out'].to_numpy())
+labels_t = df_frame_t[df_frame_t['layer']==2]['labels'].to_numpy()
+
+# %%
+cum_acc = within_sample_classification_stratified(highest_level_rep_f, labels_f)
+print(cum_acc)
+
+cum_acc = within_sample_classification_stratified(highest_level_rep_t, labels_t)
+print(cum_acc)
+
+# %%
+# try normalising activity and test decoding
+def normalise(rep_array):
+    for i in range(len(rep_array)):
+        mean = np.mean(rep_array[i])
+        var = np.var(rep_array[i])
+        rep_array[i] = (rep_array[i]-mean) / np.sqrt(var)
+    return rep_array
+
+# %%
+acc1, acc2 = linear_regression(normalise(np.vstack(df_seq_f[df_seq_f['is_train']==1][df_seq_f['layer']==2]['r_out'].to_numpy())),
+                           df_seq_f[df_seq_f['is_train']==1][df_seq_f['layer']==2]['labels'].to_numpy(),
+                           normalise(np.vstack(df_seq_f[df_seq_f['is_train'] == 0][df_seq_f['layer'] == 2]['r_out'].to_numpy())),
+                           df_seq_f[df_seq_f['is_train'] == 0][df_seq_f['layer'] == 2]['labels'].to_numpy()
+                           )
+print(acc1, acc2)
+# %%
+acc1, acc2 = linear_regression(np.nan_to_num(normalise(np.vstack(df_frame_t[df_frame_t['is_train']==1][df_frame_t['layer']==2]['r_out'].to_numpy())), nan=0),
+                           df_frame_t[df_frame_t['is_train']==1][df_frame_t['layer']==2]['labels'].to_numpy(),
+                           np.nan_to_num(normalise(np.vstack(df_frame_t[df_frame_t['is_train'] == 0][df_frame_t['layer'] == 2]['r_out'].to_numpy())), nan=0),
+                           df_frame_t[df_frame_t['is_train'] == 0][df_frame_t['layer'] == 2]['labels'].to_numpy()
+                           )
+print(acc1, acc2)
+
+# %%
+# # sort representations by class first before passing to rdm function
+idx_f = np.argsort(labels_f)
+idx_t = np.argsort(labels_t)
+
+rdm_f = rdm_w_rep(highest_level_rep_f[idx_f], 'euclidean', istrain=True)
+# rdm_train.savefig(os.path.join(file_path, 'rdm_train.png'))
+rdm_t = rdm_w_rep(highest_level_rep_t[idx_t], 'euclidean', istrain=False)
+# rdm_test.savefig(os.path.join(file_path, 'rdm_test.png'))
+

@@ -115,7 +115,7 @@ def linear_regression(train_images, train_labels, test_images, test_labels):
     # avg classification performance over 10 rounds
     cumulative_accuracy_train = 0
     cumulative_accuracy_test = 0
-    for i in range(10):
+    for i in range(20):
         labels_train_vec = F.one_hot(torch.tensor(train_labels)).numpy()
         labels_test_vec = F.one_hot(torch.tensor(test_labels)).numpy()
 
@@ -126,7 +126,7 @@ def linear_regression(train_images, train_labels, test_images, test_labels):
         labels_predicted_train = (labels_predicted_train == labels_predicted_train.max(axis=1, keepdims=True)).astype(
             int)
         acc_train = accuracy_score(labels_train_vec, labels_predicted_train)
-        cumulative_accuracy_train += acc_train / 10
+        cumulative_accuracy_train += acc_train / 20
 
         # assess performance on test set
         labels_predicted = reg.predict(test_images)
@@ -137,7 +137,7 @@ def linear_regression(train_images, train_labels, test_images, test_labels):
         # Calculate accuracy on test set: put test set into model, calculate fraction of TP+TN over all responses
         accuracy = accuracy_score(labels_test_vec, labels_predicted)
 
-        cumulative_accuracy_test += accuracy / 10
+        cumulative_accuracy_test += accuracy / 20
 
     return cumulative_accuracy_train, cumulative_accuracy_test
 

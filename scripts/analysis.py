@@ -5,7 +5,7 @@ import yaml
 
 from evaluation import *
 from fc_net import FcDHPC
-from rf_net_cm import RfDHPC_cm
+from rf_net_cm_scratch import RfDHPC_cm
 
 file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs')
 
@@ -99,7 +99,7 @@ elif config['architecture'] == 'RfDHPC_cm':
                             device=device, dtype=dtype)
 
 trained_net.load_state_dict(
-    torch.load(glob.glob(file_path + '/reset_per_frame_true/trained_model/*readout.pth')[0],
+    torch.load(glob.glob(file_path + '/reset_per_frame_false/trained_model/*readout.pth')[0],
                map_location=torch.device('cpu')))
 
 # %%

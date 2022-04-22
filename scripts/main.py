@@ -125,7 +125,7 @@ if __name__ == '__main__':
     ###########################
     with torch.no_grad():  # turn off auto grad function
         # meta data on MNIST dataset
-        numClass = 10
+        numClass = config['num_classes']
         dataWidth = 28 + 2 * config['padding_size']
 
         # Hyperparameters for training logged with wandb

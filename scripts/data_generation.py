@@ -61,6 +61,7 @@ else:
 targets = torch.randperm(10)
 if num_classes < 10:
     targets = targets[:num_classes]
+    print('classes taken: ', targets)
     idx = 0
     for t in range(len(targets)):
         idx += full_dataset.targets == targets[t]

@@ -34,7 +34,7 @@ test_size = config['test_size']  # test dataset size
 frames_per_sequence = config['frame_per_sequence']
 padding = config['padding_size']
 data_width = 28 + padding * 2
-num_classes = 10
+num_classes = config['num_classes']
 
 # download data
 if dataset == 'MNIST':
@@ -57,9 +57,21 @@ else:
     )
 
 # %%
-indices = np.arange(len(full_dataset))
-train_indices, test_indices = train_test_split(indices, train_size=train_size * 10, test_size=test_size * 10,
-                                               stratify=full_dataset.targets)
+# get only certain number of classes
+targets = torch.randperm(10)
+if num_classes < 10:
+    targets = targets[:num_classes]
+    idx = 0
+    for t in range(len(targets)):
+        idx += full_dataset.targets == targets[t]
+    # full_dataset = Subset(full_dataset, np.where(idx == 1)[0])
+    indices = np.where(idx == 1)[0]
+else:
+    indices = np.arange(len(full_dataset))
+
+# %%
+train_indices, test_indices = train_test_split(indices, train_size=train_size * len(targets), test_size=test_size * len(targets),
+                                               stratify=full_dataset.targets[indices])
 
 # Warp into Subsets and DataLoaders
 train_dataset = Subset(full_dataset, train_indices)

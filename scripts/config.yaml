@@ -3,18 +3,18 @@ dataset_dir: ../data/datasets
 # MNIST, fashionMNIST
 dataset_type: fashionMNIST
 num_classes: 5
-train_size: 5
-test_size: 2
+train_size: 50
+test_size: 10
 pin_mem: True
 batch_size: 1
 num_workers: 2
 padding_size: 5
 
 # network hyperparameters
-epochs: 20
+epochs: 40
 infsteps: 200
 infrates: [.01, .01, .01, .01]
-network_size: [1444, 2000, 100]
+network_size: [1444, 2500, 700, 100]
 learning_rate: .001
 act_func: sigmoid  # relu, sigmoid
 per_seq_repeat: 1

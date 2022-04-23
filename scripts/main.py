@@ -257,10 +257,11 @@ if __name__ == '__main__':
 
             if (epoch % 10 == 0) or (epoch == epochs - 1):  # evaluation every 5 epochs
                 # organise reps logged during training
-                rep_train = np.vstack(rep_train)
-                label_train = torch.concat(label_train).numpy()
                 train_reps_dataset = data.TensorDataset(rep_train, label_train)
                 torch.save(train_reps_dataset, trained_model_dir + 'epoch' + str(epoch) + 'train_rep.pt')
+                rep_train = np.vstack(rep_train)
+                label_train = torch.concat(label_train).numpy()
+
                 # get error on single frames
                 errors_test = []
                 rep_still_test = []  # log rep generated from still images for classification testing
@@ -286,10 +287,11 @@ if __name__ == '__main__':
                 })
 
                 # organise arrays logging reps for test still imgs
-                rep_still_test = np.vstack(rep_still_test)  # representations
-                rep_still_labels = torch.concat(rep_still_labels).numpy()  # labels
                 still_reps_dataset = data.TensorDataset(rep_still_test, rep_still_labels)
                 torch.save(still_reps_dataset, trained_model_dir + 'epoch' + str(epoch) + 'test_still_reps.pt')
+                rep_still_test = np.vstack(rep_still_test)  # representations
+                rep_still_labels = torch.concat(rep_still_labels).numpy()  # labels
+
 
                 # assess clustering
                 within_sample_acc = within_sample_classification_stratified(rep_train, label_train)
@@ -325,10 +327,10 @@ if __name__ == '__main__':
                             seq_label_test.append(_label)
                             net.init_states()
                     # convert arrays
-                    seq_rep_test = np.vstack(seq_rep_test)
-                    seq_label_test = torch.concat(seq_label_test).numpy()
                     seq_reps_dataset = data.TensorDataset(seq_rep_test, seq_label_test)
                     torch.save(seq_reps_dataset, trained_model_dir + 'epoch' + str(epoch) + 'seq_rep_test.pt')
+                    seq_rep_test = np.vstack(seq_rep_test)
+                    seq_label_test = torch.concat(seq_label_test).numpy()
 
                     # assess generalisation using all seq reps , use two types of classifiers
                     # linear regression
@@ -376,7 +378,7 @@ if __name__ == '__main__':
 
         # %%
         # inspect convergence of last layer
-        inf_step = np.arange(0, 20000)
+        inf_step = np.arange(0, 5000)
         high_layer_output = []
         mid_layer_output = []
         input_layer_output = []

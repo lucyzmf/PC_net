@@ -257,7 +257,7 @@ if __name__ == '__main__':
 
             if (epoch % 10 == 0) or (epoch == epochs - 1):  # evaluation every 5 epochs
                 # organise reps logged during training
-                train_reps_dataset = data.TensorDataset(rep_train, label_train)
+                train_reps_dataset = data.TensorDataset(torch.tensor(rep_train), torch.tensor(label_train))
                 torch.save(train_reps_dataset, trained_model_dir + 'epoch' + str(epoch) + 'train_rep.pt')
                 rep_train = np.vstack(rep_train)
                 label_train = torch.concat(label_train).numpy()
@@ -287,7 +287,7 @@ if __name__ == '__main__':
                 })
 
                 # organise arrays logging reps for test still imgs
-                still_reps_dataset = data.TensorDataset(rep_still_test, rep_still_labels)
+                still_reps_dataset = data.TensorDataset(torch.tensor(rep_still_test), torch.tensor(rep_still_labels))
                 torch.save(still_reps_dataset, trained_model_dir + 'epoch' + str(epoch) + 'test_still_reps.pt')
                 rep_still_test = np.vstack(rep_still_test)  # representations
                 rep_still_labels = torch.concat(rep_still_labels).numpy()  # labels
@@ -327,7 +327,7 @@ if __name__ == '__main__':
                             seq_label_test.append(_label)
                             net.init_states()
                     # convert arrays
-                    seq_reps_dataset = data.TensorDataset(seq_rep_test, seq_label_test)
+                    seq_reps_dataset = data.TensorDataset(torch.tensor(seq_rep_test), torch.tensor(seq_label_test))
                     torch.save(seq_reps_dataset, trained_model_dir + 'epoch' + str(epoch) + 'seq_rep_test.pt')
                     seq_rep_test = np.vstack(seq_rep_test)
                     seq_label_test = torch.concat(seq_label_test).numpy()

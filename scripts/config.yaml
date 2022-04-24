@@ -13,7 +13,7 @@ padding_size: 5
 # network hyperparameters
 epochs: 50
 infsteps: 200
-infrates: [.01, .01, .01, .01]
+infrates: [.05, .05, .03, .03]
 network_size: [1444, 2500, 800, 100]
 learning_rate: .001
 act_func: sigmoid  # relu, sigmoid

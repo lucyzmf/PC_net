@@ -365,6 +365,10 @@ if __name__ == '__main__':
 
                 # save trained models
                 if epoch == epochs - 1:
+                    torch.save(net.state_dict(),
+                               trained_model_dir + str(config['morph_type']) + str(net.architecture) +
+                               str(net.inf_rates) + str(seq_train) + str(reg_type) + '_' + str(reg_strength) +
+                               str(wbconfig.update_per_frame) + 'end_training' + 'readout.pth')
                     print('end training')
 
         # %%

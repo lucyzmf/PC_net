@@ -1,14 +1,7 @@
 '''
 This script evalute trained models
 '''
-import glob
-import os
-import time
 
-import pandas as pd
-import seaborn as sns
-import yaml
-from sklearn.manifold import TSNE
 from torch import nn
 from torch.utils import data
 
@@ -33,16 +26,17 @@ config = load_config("config.yaml")
 if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
     print("Cuda is available")
-    file_path = '../results/80_epochs'
+    file_path = '../results/morph_test_9'
 else:
     dev = "cpu"
     print("Cuda not available")
-    file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_8/test 2/')
-    dataDir = '/data 5stillperclass/'
+    file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_9')
+    dataDir = '/'
 device = torch.device(dev)
 
 dtype = torch.float  # Set standard datatype
 
+torch.manual_seed(0)
 
 #  pytorch logistic regression
 class LogisticRegression(torch.nn.Module):
@@ -116,35 +110,37 @@ elif config['architecture'] == 'RfDHPC_cm':
                             act_func=config['act_func'],
                             device=device, dtype=dtype)
 
-# %%
-# # distribution of trained weights
-#
-# fig, axs = plt.subplots(1, len(arch) - 1, figsize=(12, 4))
-# for i in range(len(arch) - 1):
-#     axs[i].hist(trained_net.layers[i].weights)
-#     axs[i].set_title('layer' + str(i))
-#
-# plt.show()
-# fig.savefig(os.path.join(file_path + '/reset_per_frame_false/', 'weight_dist'))
 
 # %%
 # create dataframe of representations using train and test images
 # TODO classification acc on r from all layers
 
+# raise Exception('stop')
+
 print('generate representations')
 # create data frame that has columns: is_train, layers, r_act, r_out, e_out, reset at the end of each sequence
 trained_net_false.load_state_dict(
-    torch.load(glob.glob(file_path + '/6 train_size5_8updatesmorph_test_8_resetFalse_seqtrainTrue2022-04-20 '
-                                     '16:58:32.794805/**/*readout.pth')[2],
+    torch.load('/morph_test_9_resetFalse_seqtrainTrue2022-04-24 09:50:30.302287/trained_model/spin[1444, 2500, 800, 100][0.05, 0.05, 0.03, 0.03]Truel2_0.018.0end_trainingreadout.pth',
                map_location=torch.device('cpu')))
 trained_net_false.eval()
 
 trained_net_true.load_state_dict(
-    torch.load(glob.glob(file_path + '/2 train_size5_40updatesmorph_test_8_resetTrue_seqtrainTrue2022-04-20 '
-                                     '10:18:06.770530/**/*readout.pth')[0],
-               map_location=torch.device('cpu')))
+    torch.load(
+        '/morph_test_9_resetFalse_seqtrainTrue2022-04-24 09:50:30.302287/trained_model/spin[1444, 2500, 800, 100][0.05, 0.05, 0.03, 0.03]Truel2_0.018.0end_trainingreadout.pth',
+        map_location=torch.device('cpu')))
 trained_net_true.eval()
 
+# %%
+# # distribution of trained weights
+#
+# fig, axs = plt.subplots(1, len(arch) - 1, figsize=(12, 4))
+# for i in range(len(arch) - 1):
+#     axs[i].hist(trained_net_false.layers[i].weights)
+#     axs[i].set_title('layer' + str(i))
+#
+# plt.show()
+
+# raise Exception('stop')
 # %%
 is_train, layer = [], []  # whether rep is generated from training set
 # contains reps generated without resetting per frame seq dataset
@@ -297,7 +293,7 @@ by_layer = []
 
 
 def get_layer_acc(dataframe, _layer):
-    _, acc = knn_classifier(
+    _, acc = linear_regression(
         np.vstack(dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['r_out'].to_numpy()),
         dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['labels'].to_numpy(),
         np.vstack(dataframe[dataframe['is_train'] == 0][dataframe['layer'] == _layer][
@@ -333,7 +329,7 @@ plt.title('seq to seq generalisation: acc by layer')
 # plt.show()
 plt.savefig(os.path.join(file_path, 'seq to seq generalisation: acc by layer.png'))
 
-  # %%
+# %%
 # frame to frame
 frame_to_frame_acc = []
 reset_per_frame = []
@@ -511,34 +507,7 @@ print(acc1, acc2)
 # %%
 # tSNE clustering
 
-def plot_tsne(reps, labels):
-    print('tSNE clustering')
-    time_start = time.time()
-    tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=1000)
-    tsne_results = tsne.fit_transform(np.vstack(reps))
-    print('t-SNE done! Time elapsed: {} seconds'.format(time.time() - time_start))
-    #
-    # # %%
-    # # visualisation
-    df = pd.DataFrame()
-    df['tsne-one'] = tsne_results[:, 0]
-    df['tsne-two'] = tsne_results[:, 1]
-    df['y'] = labels
-    fig, ax1 = plt.subplots(figsize=(10, 8))
-    sns.scatterplot(
-        x="tsne-one", y="tsne-two",
-        hue="y",
-        palette=sns.color_palette("bright", 10),
-        data=df,
-        legend="full",
-        alpha=0.3,
-        ax=ax1
-    )
 
-    plt.show()
-# fig.savefig(os.path.join(file_path, 'tSNE_clustering_rep'))
-
-# %%
 plot_tsne(df_seq_f[df_seq_f['is_train']==1][df_seq_f['layer']==2]['r_out'].to_numpy(), df_seq_f[df_seq_f['is_train']==1][df_seq_f['layer']==2]['labels'].to_numpy())
 
 # %%

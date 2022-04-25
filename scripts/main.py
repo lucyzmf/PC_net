@@ -102,10 +102,10 @@ if __name__ == '__main__':
     test_set = torch.load(
         os.path.join(config['dataset_dir'], str(dataset) + 'test_set_' + str(morph_type) + '.pt'))
     if reset_per_frame:
-        test_loader = data.DataLoader(train_set, batch_size=batchSize, num_workers=n_workers,
+        test_loader = data.DataLoader(test_set, batch_size=batchSize, num_workers=n_workers,
                                       pin_memory=pin_mem, shuffle=True)
     else:
-        test_loader = data.DataLoader(train_set, batch_size=batchSize, num_workers=n_workers,
+        test_loader = data.DataLoader(test_set, batch_size=batchSize, num_workers=n_workers,
                                       pin_memory=pin_mem, shuffle=False)
 
     # load test still images

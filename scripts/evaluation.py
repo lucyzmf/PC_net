@@ -264,7 +264,7 @@ def pca_vis_2d(reps, labels):
     pipe = Pipeline([('scaler', StandardScaler()), ('pca', pca)])
     Xt = pipe.fit_transform(reps)
     plot = plt.scatter(Xt[:, 0], Xt[:, 1], c=labels, cmap='Paired')
-    plt.legend(handles=plot.legend_elements()[0], labels=[0, 1, 2, 3, 4])
+    plt.legend(handles=plot.legend_elements()[0], labels=list(np.unique(labels)))
 
     return plt
 
@@ -276,6 +276,6 @@ def pca_vis_3d(reps, labels):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
     ax.scatter(Xt[:, 1], Xt[:, 2], Xt[:, 3], c=labels, cmap='Paired')
-    # ax.legend(handles=fig.legend_elements()[0], labels=[0, 1, 2, 3, 4])
+    # ax.legend(handles=ax.legend_elements()[0], labels=list(np.unique(labels)))
 
     return fig

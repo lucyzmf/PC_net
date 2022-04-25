@@ -2,14 +2,33 @@
 ###########################
 #  evaluation functions
 ###########################
+import os
+import time
+
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import torch
 import torch.nn.functional as F
+import yaml
 from matplotlib import pyplot as plt
 from sklearn import linear_model
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 from sklearn.metrics import pairwise_distances, accuracy_score
 from sklearn.model_selection import StratifiedKFold
 from sklearn.neighbors import KNeighborsClassifier
+
+CONFIG_PATH = "../scripts/"
+
+
+def load_config(config_name):
+    with open(os.path.join(CONFIG_PATH, config_name)) as file:
+        config = yaml.safe_load(file)
+    return config
+
+
+config = load_config("config.yaml")
 
 
 def test_frame(model, test_data, inference_steps):
@@ -141,6 +160,7 @@ def linear_regression(train_images, train_labels, test_images, test_labels):
 
     return cumulative_accuracy_train, cumulative_accuracy_test
 
+
 # %%
 def within_sample_classification_stratified(representations, labels):
     skf = StratifiedKFold(n_splits=5, shuffle=True)  # split into 5 folds
@@ -171,11 +191,12 @@ def within_sample_classification_stratified(representations, labels):
     return cumulative_accuracy
 
 
-
 # %%
 # generate rdm with representations
 
-def rdm_w_rep(representations, metric_type, istrain):
+def rdm_w_rep(representations, labels, metric_type, istrain):  # inputs here are unordered
+    idx = np.argsort(labels)
+    representations = representations[idx]
     pair_dist_cosine = pairwise_distances(representations, metric=metric_type)
 
     fig, ax = plt.subplots()
@@ -189,14 +210,72 @@ def rdm_w_rep(representations, metric_type, istrain):
 
     return fig
 
+
 # %%
-def rdm_w_rep_title(representations, metric_type, title):
+def rdm_w_rep_title(representations, labels, metric_type, title):
+    idx = np.argsort(labels)
+    representations = representations[idx]
     pair_dist_cosine = pairwise_distances(representations, metric=metric_type)
 
     fig, ax = plt.subplots()
     im = ax.imshow(pair_dist_cosine)
     fig.colorbar(im, ax=ax)
     ax.set_title(title)
+    # plt.show()
+
+    return fig
+
+
+# %%
+def plot_tsne(reps, labels):
+    print('tSNE clustering')
+    time_start = time.time()
+    tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=500)
+    tsne_results = tsne.fit_transform(np.vstack(reps))
+    print('t-SNE done! Time elapsed: {} seconds'.format(time.time() - time_start))
+    #
+    # # %%
+    # # visualisation
+    df = pd.DataFrame()
+    df['tsne-one'] = tsne_results[:, 0]
+    df['tsne-two'] = tsne_results[:, 1]
+    df['y'] = labels
+    fig, ax1 = plt.subplots(figsize=(10, 8))
+    sns.scatterplot(
+        x="tsne-one", y="tsne-two",
+        hue="y",
+        palette=sns.color_palette("bright", config['num_classes']),
+        data=df,
+        legend="full",
+        alpha=0.3,
+        ax=ax1
+    )
+
     plt.show()
+
+
+# %%
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+
+
+def pca_vis_2d(reps, labels):
+    pca = PCA()
+    pipe = Pipeline([('scaler', StandardScaler()), ('pca', pca)])
+    Xt = pipe.fit_transform(reps)
+    plot = plt.scatter(Xt[:, 0], Xt[:, 1], c=labels, cmap='Paired')
+    plt.legend(handles=plot.legend_elements()[0], labels=[0, 1, 2, 3, 4])
+
+    return plt
+
+
+def pca_vis_3d(reps, labels):
+    pca = PCA()
+    pipe = Pipeline([('scaler', StandardScaler()), ('pca', pca)])
+    Xt = pipe.fit_transform(reps)
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.scatter(Xt[:, 1], Xt[:, 2], Xt[:, 3], c=labels, cmap='Paired')
+    # ax.legend(handles=fig.legend_elements()[0], labels=[0, 1, 2, 3, 4])
 
     return fig

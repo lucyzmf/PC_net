@@ -172,7 +172,8 @@ if __name__ == '__main__':
         total_errors_test = []
         last_layer_act_log = []
         clustering_acc = []
-        test_acc_history = []  # acc on test set at the end of each epoch
+        test_acc_history_reg = []  # acc on test set at the end of each epoch
+        test_acc_history_knn = []
         best_gen_acc = 0
 
         # sample image and label to test reconstruction
@@ -255,12 +256,16 @@ if __name__ == '__main__':
                 'avg last layer act': last_layer_act_log[-1]
             })
 
-            if (epoch % 10 == 0) or (epoch == epochs - 1):  # evaluation every 5 epochs
+            if (epoch % 10 == 0) or (epoch == epochs - 1):  # evaluation every 10 epochs
                 # organise reps logged during training
                 train_reps_dataset = data.TensorDataset(torch.tensor(rep_train), torch.tensor(label_train))
                 torch.save(train_reps_dataset, trained_model_dir + 'epoch' + str(epoch) + 'train_rep.pt')
                 rep_train = np.vstack(rep_train)
                 label_train = torch.concat(label_train).numpy()
+
+                # generate rdm with train reps
+                fig_train = rdm_w_rep_title(rep_train, label_train, 'RDM of training sequence representations')
+                wandb.log({'rdm train data': wandb.Image(fig_train)})
 
                 # get error on single frames
                 errors_test = []
@@ -292,6 +297,9 @@ if __name__ == '__main__':
                 rep_still_test = np.vstack(rep_still_test)  # representations
                 rep_still_labels = torch.concat(rep_still_labels).numpy()  # labels
 
+                # generate rdm with still test reps
+                fig_test_still = rdm_w_rep_title(rep_still_test, rep_still_labels, 'RDM of still test image representations')
+                wandb.log({'rdm test still data': wandb.Image(fig_test_still)})
 
                 # assess clustering
                 within_sample_acc = within_sample_classification_stratified(rep_train, label_train)
@@ -332,9 +340,14 @@ if __name__ == '__main__':
                     seq_rep_test = np.vstack(seq_rep_test)
                     seq_label_test = torch.concat(seq_label_test).numpy()
 
+                    # generate rdm with train reps
+                    fig_test = rdm_w_rep_title(seq_rep_test, seq_label_test, 'RDM of test sequence representations')
+                    wandb.log({'rdm test seq': wandb.Image(fig_test)})
+
                     # assess generalisation using all seq reps , use two types of classifiers
                     # linear regression
                     acc_train, acc_test = linear_regression(rep_train, label_train, seq_rep_test, seq_label_test)
+                    test_acc_history_reg.append(acc_test)
                     print('epoch: %i: generalisation, seq rep to seq rep linear regression test acc %.4f' % (
                         epoch, acc_test))
                     if acc_test > best_gen_acc:  # save best gen acc model
@@ -347,6 +360,7 @@ if __name__ == '__main__':
 
                     # knn classification on train and test sequence
                     _, cum_acc_knn = knn_classifier(rep_train, label_train, seq_rep_test, seq_label_test)
+                    test_acc_history_knn.append(cum_acc_knn)
                     print('epoch: %i: generalisation, seq rep to seq rep knn test acc %.4f'
                           % (epoch, cum_acc_knn))
 
@@ -372,61 +386,61 @@ if __name__ == '__main__':
                     print('end training')
 
         # %%
-        _, _, fig_train = generate_rdm(net, train_loader, inference_steps * 5)
-        wandb.log({'rdm train data': wandb.Image(fig_train)})
-        if seq_train:
-            _, _, fig_test = generate_rdm(net, test_loader, inference_steps * 5)
-            wandb.log({'rdm seq test data': wandb.Image(fig_test)})
-        _, _, fig_test = generate_rdm(net, test_still_img_loader, inference_steps * 5)
-        wandb.log({'rdm still image test data': wandb.Image(fig_test)})
+        # _, _, fig_train = generate_rdm(net, train_loader, inference_steps * 5)
+        # wandb.log({'rdm train data': wandb.Image(fig_train)})
+        # if seq_train:
+        #     _, _, fig_test = generate_rdm(net, test_loader, inference_steps * 5)
+        #     wandb.log({'rdm seq test data': wandb.Image(fig_test)})
+        # _, _, fig_test = generate_rdm(net, test_still_img_loader, inference_steps * 5)
+        # wandb.log({'rdm still image test data': wandb.Image(fig_test)})
 
         # %%
-        # inspect convergence of last layer
-        inf_step = np.arange(0, 5000)
-        high_layer_output = []
-        mid_layer_output = []
-        input_layer_output = []
-        error_intput = []
-        error_mid = []
-
-        net.init_states()
-        for i in inf_step:
-            net(sample_image, 1, istrain=False)
-            high_layer_output.append(net.states['r_output'][-1].detach().cpu().numpy())
-            mid_layer_output.append(net.states['r_output'][-2].detach().cpu().numpy())
-            input_layer_output.append(net.states['r_output'][0].detach().cpu().numpy())
-
-            error_intput.append(net.states['error'][0].detach().cpu().numpy())
-            error_mid.append(net.states['error'][-2].detach().cpu().numpy())
-
-        # %%
-        fig, axs = plt.subplots(2, 3, figsize=(24, 10))
-        w_0_1 = net.layers[0].weights.cpu()
-        bu_error_to_hidden = np.matmul(torch.transpose(w_0_1, 0, 1).numpy(), np.transpose(np.vstack(error_intput)))
-
-        axs[0][0].plot(inf_step, (np.transpose(bu_error_to_hidden) - error_mid))
-        axs[0][0].set_title('amount of update to hidden layer')
-        axs[0][1].plot(inf_step, mid_layer_output)
-        axs[0][1].set_title('hidden layer output')
-        axs[0][2].plot(inf_step, high_layer_output)
-        axs[0][2].set_title('highest layer output')
-
-        mse_input = np.mean(np.vstack(error_intput), axis=1) ** 2
-        mse_mid = np.mean(np.vstack(error_mid), axis=1) ** 2
-
-        axs[1][0].plot(inf_step, mse_input)
-        axs[1][0].set_title('input layer MSE')
-        axs[1][1].plot(inf_step, mse_mid)
-        axs[1][1].set_title('hidden layer MSE')
-
-        # plot bu_error - e_act to layer 2
-        w_1_2 = net.layers[1].weights.cpu()
-        bu_error_hidden_to_last = np.matmul(torch.transpose(w_1_2, 0, 1).numpy(), np.transpose(np.vstack(error_mid)))
-        axs[1][2].plot(inf_step, (np.transpose(bu_error_hidden_to_last)))
-        axs[1][2].set_title('amount of update to last layer')
-
-        plt.show()
-        plt.savefig(os.path.join(trained_model_dir, 'convergence.png'))
+        # # inspect convergence of last layer
+        # inf_step = np.arange(0, 5000)
+        # high_layer_output = []
+        # mid_layer_output = []
+        # input_layer_output = []
+        # error_intput = []
+        # error_mid = []
+        #
+        # net.init_states()
+        # for i in inf_step:
+        #     net(sample_image, 1, istrain=False)
+        #     high_layer_output.append(net.states['r_output'][-1].detach().cpu().numpy())
+        #     mid_layer_output.append(net.states['r_output'][-2].detach().cpu().numpy())
+        #     input_layer_output.append(net.states['r_output'][0].detach().cpu().numpy())
+        #
+        #     error_intput.append(net.states['error'][0].detach().cpu().numpy())
+        #     error_mid.append(net.states['error'][-2].detach().cpu().numpy())
+        #
+        # # %%
+        # fig, axs = plt.subplots(2, 3, figsize=(24, 10))
+        # w_0_1 = net.layers[0].weights.cpu()
+        # bu_error_to_hidden = np.matmul(torch.transpose(w_0_1, 0, 1).numpy(), np.transpose(np.vstack(error_intput)))
+        #
+        # axs[0][0].plot(inf_step, (np.transpose(bu_error_to_hidden) - error_mid))
+        # axs[0][0].set_title('amount of update to hidden layer')
+        # axs[0][1].plot(inf_step, mid_layer_output)
+        # axs[0][1].set_title('hidden layer output')
+        # axs[0][2].plot(inf_step, high_layer_output)
+        # axs[0][2].set_title('highest layer output')
+        #
+        # mse_input = np.mean(np.vstack(error_intput), axis=1) ** 2
+        # mse_mid = np.mean(np.vstack(error_mid), axis=1) ** 2
+        #
+        # axs[1][0].plot(inf_step, mse_input)
+        # axs[1][0].set_title('input layer MSE')
+        # axs[1][1].plot(inf_step, mse_mid)
+        # axs[1][1].set_title('hidden layer MSE')
+        #
+        # # plot bu_error - e_act to layer 2
+        # w_1_2 = net.layers[1].weights.cpu()
+        # bu_error_hidden_to_last = np.matmul(torch.transpose(w_1_2, 0, 1).numpy(), np.transpose(np.vstack(error_mid)))
+        # axs[1][2].plot(inf_step, (np.transpose(bu_error_hidden_to_last)))
+        # axs[1][2].set_title('amount of update to last layer')
+        #
+        # plt.show()
+        # plt.savefig(os.path.join(trained_model_dir, 'convergence.png'))
 
         # %%
         # save important datapoints for later plotting
@@ -446,6 +460,11 @@ if __name__ == '__main__':
         plt.plot(np.arange(len(clustering_acc)), clustering_acc)
         plt.title('clustering acc during training')
         plt.savefig(os.path.join(trained_model_dir, 'cluster_acc.png'))
+
+        # %%
+        # save gen acc log
+        log['genAccReg'] = test_acc_history_reg
+        log['genAccKnn'] = test_acc_history_knn
 
         # %%
         with open(trained_model_dir + test_name + 'training_metrics_log.pkl', 'wb') as f:

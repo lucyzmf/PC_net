@@ -173,7 +173,7 @@ if __name__ == '__main__':
         last_layer_act_log = []
         clustering_acc = []
         test_acc_history_reg = []  # acc on test set at the end of each epoch
-        test_acc_history_knn = []
+        # test_acc_history_knn = []
         best_gen_acc = 0
 
         # sample image and label to test reconstruction
@@ -264,7 +264,7 @@ if __name__ == '__main__':
                 label_train = torch.concat(label_train).numpy()
 
                 # generate rdm with train reps
-                fig_train = rdm_w_rep_title(rep_train, label_train, 'RDM of training sequence representations')
+                fig_train = rdm_w_rep_title(rep_train, label_train, 'cosine', 'RDM of training sequence representations')
                 wandb.log({'rdm train data': wandb.Image(fig_train)})
 
                 # get error on single frames
@@ -298,7 +298,7 @@ if __name__ == '__main__':
                 rep_still_labels = torch.concat(rep_still_labels).numpy()  # labels
 
                 # generate rdm with still test reps
-                fig_test_still = rdm_w_rep_title(rep_still_test, rep_still_labels, 'RDM of still test image representations')
+                fig_test_still = rdm_w_rep_title(rep_still_test, rep_still_labels, 'cosine', 'RDM of still test image representations')
                 wandb.log({'rdm test still data': wandb.Image(fig_test_still)})
 
                 # assess clustering
@@ -316,12 +316,11 @@ if __name__ == '__main__':
                 _, acc_still_test_reg = linear_regression(rep_train, label_train, rep_still_test, rep_still_labels)
                 print('generalisation: linear regression on still test images: %.4f' % acc_still_test_reg)
 
-                _, acc_still_test_knn = knn_classifier(rep_train, label_train, rep_still_test, rep_still_labels)
-                print('generalisation: knn on still test images: %.4f' % acc_still_test_knn)
+                # _, acc_still_test_knn = knn_classifier(rep_train, label_train, rep_still_test, rep_still_labels)
+                # print('generalisation: knn on still test images: %.4f' % acc_still_test_knn)
                 wandb.log({
                     'epoch': epoch,
-                    'generalisation to still img (linear regression)': acc_still_test_reg,
-                    'generalisation to still img (knn)': acc_still_test_knn
+                    'generalisation to still img (linear regression)': acc_still_test_reg
                 })
 
                 if seq_train:
@@ -341,7 +340,7 @@ if __name__ == '__main__':
                     seq_label_test = torch.concat(seq_label_test).numpy()
 
                     # generate rdm with train reps
-                    fig_test = rdm_w_rep_title(seq_rep_test, seq_label_test, 'RDM of test sequence representations')
+                    fig_test = rdm_w_rep_title(seq_rep_test, seq_label_test, 'cosine', 'RDM of test sequence representations')
                     wandb.log({'rdm test seq': wandb.Image(fig_test)})
 
                     # assess generalisation using all seq reps , use two types of classifiers
@@ -359,15 +358,14 @@ if __name__ == '__main__':
                                        best_gen_acc) + 'readout.pth')
 
                     # knn classification on train and test sequence
-                    _, cum_acc_knn = knn_classifier(rep_train, label_train, seq_rep_test, seq_label_test)
-                    test_acc_history_knn.append(cum_acc_knn)
-                    print('epoch: %i: generalisation, seq rep to seq rep knn test acc %.4f'
-                          % (epoch, cum_acc_knn))
+                    # _, cum_acc_knn = knn_classifier(rep_train, label_train, seq_rep_test, seq_label_test)
+                    # test_acc_history_knn.append(cum_acc_knn)
+                    # print('epoch: %i: generalisation, seq rep to seq rep knn test acc %.4f'
+                    #       % (epoch, cum_acc_knn))
 
                     wandb.log({
                         'epoch': epoch,
-                        'generalisation, seq rep to seq rep linear regression': acc_test,
-                        'generalisation, seq rep to seq rep knn': cum_acc_knn
+                        'generalisation, seq rep to seq rep linear regression': acc_test
                     })
 
                 # sample reconstruction
@@ -464,7 +462,7 @@ if __name__ == '__main__':
         # %%
         # save gen acc log
         log['genAccReg'] = test_acc_history_reg
-        log['genAccKnn'] = test_acc_history_knn
+        # log['genAccKnn'] = test_acc_history_knn
 
         # %%
         with open(trained_model_dir + test_name + 'training_metrics_log.pkl', 'wb') as f:

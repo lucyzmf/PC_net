@@ -20,14 +20,14 @@ act_func: sigmoid  # relu, sigmoid
 per_seq_repeat: 1
 
 # network architecture: FcDHPC,RfDHPC_cm
-architecture: FcDHPC
+architecture: FcDHPC_hippo
 rf_sizes: [5, 7, 9]
 stride: 1
 n_channels: [32, 64, 128]
 
 # used to generate morphing dataset
 frame_per_sequence: 9
-seq_train: True  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
+seq_train: False  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
 reset_per_frame: True
 morph_type: spin
 reg_strength: .01

@@ -159,7 +159,7 @@ if __name__ == '__main__':
         elif arch_type == 'FcDHPC_hippo':
             rf_sizes = config['rf_sizes']
             wbconfig.rf_sizes = rf_sizes
-            net = FcDHPC_hippo(arch, rf_sizes, infrates, lr=lr, act_func=config['act_func'], device=device, dtype=dtype)
+            net = FcDHPC_hippo(arch,  infrates, lr=lr, act_func=config['act_func'], device=device, dtype=dtype)
         else:
             raise TypeError('network architecture not specified')
         net.to(device)

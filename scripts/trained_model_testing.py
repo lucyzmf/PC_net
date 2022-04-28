@@ -1,13 +1,13 @@
 '''
 This script evalute trained models
 '''
+import os.path
 
 from torch import nn
 from torch.utils import data
 
 from evaluation import *
 from fc_net import FcDHPC
-from rf_net_cm_scratch import RfDHPC_cm
 
 # TODO change representation generation function since on trained dataset it should be representations generated from sequences
 
@@ -27,11 +27,12 @@ if torch.cuda.is_available():  # Use GPU if possible
     dev = "cuda:0"
     print("Cuda is available")
     file_path = '../results/morph_test_9'
+    dataDir = '/40_10perclass/'
 else:
     dev = "cpu"
     print("Cuda not available")
-    file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_9')
-    dataDir = '/'
+    file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_9/')
+    dataDir = '/40_10perclass/'
 device = torch.device(dev)
 
 dtype = torch.float  # Set standard datatype
@@ -85,9 +86,12 @@ numClass = 10  # number of classes in mnist
 # %%
 # load trained model
 # Hyperparameters used during training
-inference_steps = config['infsteps']  # num infsteps per image during testing
-epochs = config['epochs']  # total training epochs
-infrates = config['infrates']  # inf rates each layer
+inference_steps_T = 250  # num infsteps per image during testing
+inference_steps_F = 200
+
+infrates_T = [.07, .07, .05, .05]  # inf rates each layer
+infrates_F = [.05, .05, .03, .03]
+
 lr = config['learning_rate']  # lr for weight updates
 arch = config['network_size']  # size of each layer
 per_seq_repeat = config['per_seq_repeat']  # num of repeats per image/sequence
@@ -98,17 +102,17 @@ per_im_repeat = 1
 
 # trained_net = DHPC(network_architecture, inf_rates, lr=lr, act_func=sigmoid, device=device, dtype=dtype)
 if config['architecture'] == 'FcDHPC':
-    trained_net_true = FcDHPC(config['network_size'], config['infrates'], lr=config['learning_rate'],
+    trained_net_true = FcDHPC(config['network_size'], infrates_T, lr=config['learning_rate'],
                               act_func=config['act_func'],
                               device=device, dtype=dtype)
-    trained_net_false = FcDHPC(config['network_size'], config['infrates'], lr=config['learning_rate'],
+    trained_net_false = FcDHPC(config['network_size'], infrates_F, lr=config['learning_rate'],
                                act_func=config['act_func'],
                                device=device, dtype=dtype)
-elif config['architecture'] == 'RfDHPC_cm':
-    trained_net = RfDHPC_cm(config['network_size'], config['rf_sizes'], config['infrates'],
-                            lr=config['learning_rate'],
-                            act_func=config['act_func'],
-                            device=device, dtype=dtype)
+# elif config['architecture'] == 'RfDHPC_cm':
+#     trained_net = RfDHPC_cm(config['network_size'], config['rf_sizes'], config['infrates'],
+#                             lr=config['learning_rate'],
+#                             act_func=config['act_func'],
+#                             device=device, dtype=dtype)
 
 
 # %%
@@ -120,13 +124,16 @@ elif config['architecture'] == 'RfDHPC_cm':
 print('generate representations')
 # create data frame that has columns: is_train, layers, r_act, r_out, e_out, reset at the end of each sequence
 trained_net_false.load_state_dict(
-    torch.load('/morph_test_9_resetFalse_seqtrainTrue2022-04-24 09:50:30.302287/trained_model/spin[1444, 2500, 800, 100][0.05, 0.05, 0.03, 0.03]Truel2_0.018.0end_trainingreadout.pth',
+    torch.load(os.path.join(file_path, 'resetFalse_seqtrainTrue2022-04-25 16:44:35.188886/trained_model/spin'
+                                       '[1444, 2500, 800, 100][0.05, 0.05, 0.03, '
+                                       '0.03]Truel2_0.018.0end_trainingreadout.pth'),
                map_location=torch.device('cpu')))
 trained_net_false.eval()
 
 trained_net_true.load_state_dict(
-    torch.load(
-        '/morph_test_9_resetFalse_seqtrainTrue2022-04-24 09:50:30.302287/trained_model/spin[1444, 2500, 800, 100][0.05, 0.05, 0.03, 0.03]Truel2_0.018.0end_trainingreadout.pth',
+    torch.load(os.path.join(file_path, 'resetTrue_seqtrainTrue2022-04-26 13:07:27.507141/trained_model/spin'
+                                       '[1444, 2500, 800, 100][0.07, 0.07, 0.05, '
+                                       '0.05]Truel2_0.0110.0end_trainingreadout.pth'),
         map_location=torch.device('cpu')))
 trained_net_true.eval()
 
@@ -166,8 +173,8 @@ with torch.no_grad():
         tr = 1 if loader == 0 else 0  # log whether rep is generated from train or test set
         for i, (_image, _label) in enumerate(dataloaders[loader]):
             # print(i)
-            trained_net_true(_image, inference_steps, istrain=False)
-            trained_net_false(_image, inference_steps, istrain=False)
+            trained_net_true(_image, inference_steps_T, istrain=False)
+            trained_net_false(_image, inference_steps_F, istrain=False)
             if (i + 1) % config['frame_per_sequence'] == 0:  # at the end of eqch sequence
                 for l in range(len(trained_net_false.architecture)):
                     is_train.append(tr)
@@ -230,8 +237,8 @@ with torch.no_grad():
         tr = 1 if loader == 0 else 0  # log whether rep is generated from train or test set
         for i, (_image, _label) in enumerate(dataloaders[loader]):
             # print(i)
-            trained_net_true.forward(_image, inference_steps, istrain=False)
-            trained_net_false(_image, inference_steps, istrain=False)
+            trained_net_true.forward(_image, inference_steps_T, istrain=False)
+            trained_net_false(_image, inference_steps_F, istrain=False)
             # for every frame
             for l in range(len(trained_net_false.architecture)):
                 is_train_frame.append(tr)
@@ -412,8 +419,8 @@ with torch.no_grad():
         print(len(dataloaders[loader]))
         tr = 1 if loader == 0 else 0
         for i, (_image, _label) in enumerate(dataloaders[loader]):
-            trained_net_true.forward(_image, inference_steps, istrain=False)
-            trained_net_false(_image, inference_steps, istrain=False)
+            trained_net_true.forward(_image, inference_steps_T, istrain=False)
+            trained_net_false(_image, inference_steps_F, istrain=False)
             # for every frame
             for l in range(len(trained_net_false.architecture)):
                 is_train_still.append(tr)

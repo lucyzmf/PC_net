@@ -1,16 +1,18 @@
 '''
 This script evalute trained models
 '''
-import multiprocessing as mp
 import os.path
 
+from torch import nn
+from torch.utils import data
+
 from evaluation import *
+# load config
+from scripts.fc_net import FcDHPC
 
-print("Number of processors: ", mp.cpu_count())
-
+# print("Number of processors: ", mp.cpu_count())
 # TODO change representation generation function since on trained dataset it should be representations generated from sequences
 
-# load config
 CONFIG_PATH = "../scripts/"
 
 
@@ -48,7 +50,7 @@ class LogisticRegression(torch.nn.Module):
         outputs = self.linear(x)
         return outputs
 
-raise Exception('stop')
+# raise Exception('stop')
 
 # %%
 #  load the training set used during training

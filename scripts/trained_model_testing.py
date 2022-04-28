@@ -1,14 +1,21 @@
 '''
 This script evalute trained models
 '''
+print('pass')
 import os.path
+print('pass')
 
 from torch import nn
 from torch.utils import data
+print('pass')
 
 from evaluation import *
+print('pass')
+
 # load config
 from scripts.fc_net import FcDHPC
+print('pass')
+
 
 # print("Number of processors: ", mp.cpu_count())
 # TODO change representation generation function since on trained dataset it should be representations generated from sequences

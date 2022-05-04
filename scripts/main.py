@@ -75,7 +75,7 @@ if __name__ == '__main__':
     reset_per_frame = config['reset_per_frame']
 
     # set up test name
-    test_name = 'morph_test_9_reset' + str(reset_per_frame) + '_seqtrain' + str(seq_train)
+    test_name = 'morph_test_9_largerspin_reset' + str(reset_per_frame) + '_seqtrain' + str(seq_train)
     print(test_name)
 
     # load train data

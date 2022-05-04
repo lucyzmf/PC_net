@@ -1,13 +1,8 @@
 # this script returns the baseline classification acc on images of dataset
 # contains three different classification methods: knn, pure linear classifier, and logistic regression
-import os
-import time
 
 import pandas
-import seaborn as sns
 import torch.profiler
-import yaml
-from sklearn.manifold import TSNE
 from torch import nn
 from torch.autograd import Variable
 from torch.utils import data
@@ -34,8 +29,8 @@ def load_config(config_name):
         config = yaml.safe_load(file)
     return config
 
-file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_8/test 2/')
-dataDir = '/data 5stillperclass/'
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_9')
+dataDir = '/40_10perclass/'
 
 config = load_config("config.yaml")
 
@@ -160,7 +155,7 @@ fig, ax1 = plt.subplots(figsize=(10, 8))
 sns.scatterplot(
     x="tsne-one", y="tsne-two",
     hue="y",
-    palette=sns.color_palette("bright", 10),
+    palette=sns.color_palette("bright", 5),
     data=df,
     legend="full",
     alpha=0.3,
@@ -269,7 +264,7 @@ fig.colorbar(im, ax=ax)
 ax.set_title('RDM cosine of train and test images (sorted by class within each dataset)')
 plt.show()
 # fig.savefig(os.path.join(config['dataset_dir'], 'RDM coscience of train images'))
-fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of train images'))
+# fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of train images'))
 
 # %%
 # rdm of train sequences
@@ -290,9 +285,9 @@ seq_labels = seq_labels[seq_indices]
 seq_frames = seq_frames[seq_indices]
 # %%
 # example sequence
-fig, axs = plt.subplots(1, 5, sharex=True)
-for i in range(5):
-    axs[i].imshow(plotting[i])
+fig, axs = plt.subplots(1, config['frame_per_sequence'], sharey=True, figsize=(20, 5))
+for i in range(config['frame_per_sequence']):
+    axs[i].imshow(plotting[i+279])
 plt.show()
 # fig.savefig(os.path.join(config['dataset_dir'], 'example sequence in training set'))
 # fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'example sequence in training set'))
@@ -301,25 +296,25 @@ plt.show()
 
 # %%
 # rdm of one sequence
-pair_dist_cosine = pairwise_distances(seq_frames[:5], metric='cosine')
+pair_dist_cosine = pairwise_distances(seq_frames[:9], metric='cosine')
 
 fig, ax = plt.subplots()
 im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)
 ax.set_title('RDM cosine of frames one sequence in training set')
-# plt.show()
+plt.show()
 # fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one sequence in training set'))
 # fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of frames of one sequence in training set'))
 
 
 # %%
 # rdm of a class of sequence
-pair_dist_cosine = pairwise_distances(seq_frames[:5*4*10], metric='cosine')
+pair_dist_cosine = pairwise_distances(seq_frames[:config['frame_per_sequence']*4*10], metric='cosine')
 fig, ax = plt.subplots()
 im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)
 ax.set_title('RDM cosine of frames one class in training set')
-# plt.show()
+plt.show()
 # fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames one class in training set'))
 # fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of frames one class in training set'))
 
@@ -331,8 +326,16 @@ fig, ax = plt.subplots()
 im = ax.imshow(pair_dist_cosine)
 fig.colorbar(im, ax=ax)
 ax.set_title('RDM cosine of frames all classes in training set')
-# plt.show()
+plt.show()
 # fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames all classes in training set'))
 # fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of frames all classes in training set'))
 
 # %%
+pair_dist_cosine = pairwise_distances(seq_frames, metric='cosine')
+# %%
+fig, ax = plt.subplots()
+# im = ax.imshow(pair_dist_cosine)
+sns.heatmap(pair_dist_cosine, cmap='mako')
+# fig.colorbar(im, ax=ax)
+ax.set_title('RDM cosine of frames all classes in training set')
+plt.show()

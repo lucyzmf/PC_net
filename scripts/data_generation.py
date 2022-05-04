@@ -86,7 +86,7 @@ torch.save(test_dataset, os.path.join(data_dir, str(dataset) + 'test_image.pt'))
 # spinning sequences
 ##########################
 # iterate through train and test dataset samples to generate spinning sequences
-anticlockwise_deg = [-20, -15, -10, -5, 0, 5, 10, 15, 20]  # the degrees of rotation for each frame in seq
+anticlockwise_deg = [-40, -30, -20, -10, 0, 10, 20, 30, 40]  # the degrees of rotation for each frame in seq
 clockwise_deg = np.flip(anticlockwise_deg)
 degrees = np.vstack((clockwise_deg, anticlockwise_deg))
 

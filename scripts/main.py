@@ -186,25 +186,25 @@ if __name__ == '__main__':
         profile_dir = "../results/" + test_name + str(now) + '/trace/'
         trained_model_dir = "../results/" + test_name + str(now) + '/trained_model/'
         os.makedirs(trained_model_dir)
-        with torch.profiler.profile(
-                activities=[
-                    torch.profiler.ProfilerActivity.CPU,
-                    torch.profiler.ProfilerActivity.CUDA],
-                schedule=torch.profiler.schedule(
-                    wait=1,
-                    warmup=1,
-                    active=2),
-                on_trace_ready=torch.profiler.tensorboard_trace_handler(profile_dir),
-                record_shapes=True,
-                profile_memory=True,  # This will take 1 to 2 minutes. Setting it to False could greatly speedup.
-                with_stack=True
-        ) as p:
-            _image, target = train_loader.dataset[0]
-            net.init_states()
-            net(_image, inference_steps)
-            net.learn()
-            # profiler step boundary
-            p.step()
+        # with torch.profiler.profile(
+        #         activities=[
+        #             torch.profiler.ProfilerActivity.CPU,
+        #             torch.profiler.ProfilerActivity.CUDA],
+        #         schedule=torch.profiler.schedule(
+        #             wait=1,
+        #             warmup=1,
+        #             active=2),
+        #         on_trace_ready=torch.profiler.tensorboard_trace_handler(profile_dir),
+        #         record_shapes=True,
+        #         profile_memory=True,  # This will take 1 to 2 minutes. Setting it to False could greatly speedup.
+        #         with_stack=True
+        # ) as p:
+        #     _image, target = train_loader.dataset[0]
+        #     net.init_states()
+        #     net(_image, inference_steps)
+        #     net.learn()
+        #     # profiler step boundary
+        #     p.step()
 
         # finish profiling of one image, start training
         for epoch in range(epochs):

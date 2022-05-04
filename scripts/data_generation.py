@@ -58,7 +58,7 @@ else:
 
 # %%
 # get only certain number of classes
-targets = torch.randperm(10)
+targets = [0, 1, 3, 7, 8, 2, 4, 5, 6, 9]
 if num_classes < 10:
     targets = targets[:num_classes]
     print('classes taken: ', targets)

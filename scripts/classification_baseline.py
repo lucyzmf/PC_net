@@ -30,7 +30,7 @@ def load_config(config_name):
     return config
 
 file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_9')
-dataDir = '/40_10perclass/'
+dataDir = '/40_10perclass_largerangle/'
 
 config = load_config("config.yaml")
 

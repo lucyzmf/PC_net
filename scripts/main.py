@@ -75,7 +75,7 @@ if __name__ == '__main__':
     reset_per_frame = config['reset_per_frame']
 
     # set up test name
-    test_name = 'morph_test_9_largerspin_reset' + str(reset_per_frame) + '_seqtrain' + str(seq_train)
+    test_name = 'morph_test_10' + str(reset_per_frame) + '_seqtrain' + str(seq_train)
     print(test_name)
 
 
@@ -128,7 +128,7 @@ if __name__ == '__main__':
         dataWidth = 28 + 2 * config['padding_size']
 
         # Hyperparameters for training logged with wandb
-        wandb.init(project="DHPC_morph_test_9", entity="lucyzmf")  # , mode='disabled')
+        wandb.init(project="DHPC_morph_test_10", entity="lucyzmf")  # , mode='disabled')
 
         wbconfig = wandb.config
         wbconfig.infstep = inference_steps

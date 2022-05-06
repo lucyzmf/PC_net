@@ -3,15 +3,15 @@ dataset_dir: ../data/datasets
 # MNIST, fashionMNIST
 dataset_type: fashionMNIST
 num_classes: 5
-train_size: 40
-test_size: 10
+train_size: 5
+test_size: 1
 pin_mem: True
 batch_size: 1
 num_workers: 2
 padding_size: 8
 
 # network hyperparameters
-epochs: 40
+epochs: 20
 infsteps: 250
 infrates: [.07, .07, .05, .05]
 network_size: [1936, 2500, 800, 100]

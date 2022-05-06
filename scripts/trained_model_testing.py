@@ -155,62 +155,6 @@ if config['architecture'] == 'FcDHPC':
 #                             device=device, dtype=dtype)
 
 # %%
-
-def append_rep_layer(model, target, _tr, _r_act, _r_out, _e_out, _is_train, _layer, _labels):
-    for l in range(len(model.architecture)):
-        _is_train.append(_tr)
-        _layer.append(l)
-        _labels.append(int(target.cpu().numpy()))
-        # reps from false net
-        _r_act.append(model.states['r_activation'][l].detach().cpu().numpy())
-        _r_out.append(model.states['r_output'][l].detach().cpu().numpy())
-
-        if l == (len(model.architecture) - 1):
-            _e_out.append(np.zeros(model.layers[l].layer_size))
-        else:
-            _e_out.append(model.states['error'][l].detach().cpu().numpy())
-
-
-def generate_reps(model, _dataloaders, infSteps, resetPerFrame):
-    print('function called')
-    is_train, layer, labels = [], [], []  # whether rep is generated from training set
-    # contains reps generated without resetting per frame seq dataset
-    r_act = []
-    r_out = []
-    e_out = []
-
-    df_rep = pd.DataFrame()
-
-    with torch.no_grad():
-        model.init_states()
-        for loader in range(len(_dataloaders)):
-            print(len(_dataloaders[loader]))
-            tr = 1 if loader == 0 else 0  # log whether rep is generated from train or test set
-            for i, (_image, _label) in enumerate(_dataloaders[loader]):
-                # print(i)
-                model(_image, infSteps, istrain=False)
-                if not resetPerFrame:
-                    if (i + 1) % config['frame_per_sequence'] == 0:  # at the end of eqch sequence
-                        append_rep_layer(model, _label, tr, r_act, r_out, e_out, is_train, layer, labels)
-
-                        print('%i seqs done' % ((i + 1) / 9), len(is_train))
-                        model.init_states()
-                else:
-                    append_rep_layer(model, _label, tr, r_act, r_out, e_out, is_train, layer, labels)
-                    model.init_states()
-                    if i % 20 == 0:
-                        print('%i frames done' % i)
-
-    df_rep['is_train'] = is_train
-    df_rep['layer'] = layer
-    df_rep['r_out'] = r_out
-    df_rep['r_act'] = r_act
-    df_rep['e_out'] = e_out
-    df_rep['labels'] = labels
-
-    return df_rep
-
-
 def get_layer_gen_acc(dataframe, _layer):
     acc_train, acc_test = linear_regression(
         np.vstack(dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['r_out'].to_numpy()),

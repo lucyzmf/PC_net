@@ -19,13 +19,13 @@ import os
 import numpy as np
 import torch.profiler
 import datetime
-from torch import nn
 from torch.utils import data
 
 now = datetime.datetime.now()
 
 # load config
 CONFIG_PATH = "../scripts/"
+
 
 def load_config(config_name):
     with open(os.path.join(CONFIG_PATH, config_name)) as file:
@@ -78,46 +78,45 @@ if __name__ == '__main__':
     test_name = 'morph_test_9_largerspin_reset' + str(reset_per_frame) + '_seqtrain' + str(seq_train)
     print(test_name)
 
-    # load train data
+
+    # load datasets
+    def stilldataset_to_dataloader(still_tensordataset):
+        idx = still_tensordataset.indices
+        img = still_tensordataset.dataset.data[idx]
+        label = still_tensordataset.dataset.targets[idx]
+        dataset = data.TensorDataset(img, label)
+        loader = data.DataLoader(dataset, batch_size=config['batch_size'],
+                                 num_workers=config['num_workers'], pin_memory=config['pin_mem'], shuffle=True)
+
+        return loader
+
+
+    # load train still data
+    train_set_still = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
+    train_still_img_loader = stilldataset_to_dataloader(train_set_still)
+    # load test still images
+    test_set_still = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
+    test_still_img_loader = stilldataset_to_dataloader(test_set_still)
+
+    # load train seq data
     if seq_train:
         train_set = torch.load(
             os.path.join(config['dataset_dir'], str(dataset) + 'train_set_' + str(morph_type) + '.pt'))
+        # load test data
+        test_set = torch.load(
+            os.path.join(config['dataset_dir'], str(dataset) + 'test_set_' + str(morph_type) + '.pt'))
         if reset_per_frame:  # if reset per frame, shuffle spin dataset
             train_loader = data.DataLoader(train_set, batch_size=batchSize, num_workers=n_workers,
                                            pin_memory=pin_mem, shuffle=True)
+            test_loader = data.DataLoader(test_set, batch_size=batchSize, num_workers=n_workers,
+                                          pin_memory=pin_mem, shuffle=True)
         else:
             train_loader = data.DataLoader(train_set, batch_size=batchSize, num_workers=n_workers,
                                            pin_memory=pin_mem, shuffle=False)
+            test_loader = data.DataLoader(test_set, batch_size=batchSize, num_workers=n_workers,
+                                          pin_memory=pin_mem, shuffle=False)
     else:
-        train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
-        train_indices = train_set.indices
-        train_img_still = train_set.dataset.data[train_indices]
-        train_img_still = nn.functional.pad(train_img_still, (padding, padding, padding, padding))
-        train_labels_still = train_set.dataset.targets[train_indices]
-        train_still_img_dataset = data.TensorDataset(train_img_still, train_labels_still)
-        train_loader = data.DataLoader(train_still_img_dataset, batch_size=config['batch_size'],
-                                       num_workers=config['num_workers'], pin_memory=config['pin_mem'], shuffle=True)
-
-    # load test data
-    test_set = torch.load(
-        os.path.join(config['dataset_dir'], str(dataset) + 'test_set_' + str(morph_type) + '.pt'))
-    if reset_per_frame:
-        test_loader = data.DataLoader(test_set, batch_size=batchSize, num_workers=n_workers,
-                                      pin_memory=pin_mem, shuffle=True)
-    else:
-        test_loader = data.DataLoader(test_set, batch_size=batchSize, num_workers=n_workers,
-                                      pin_memory=pin_mem, shuffle=False)
-
-    # load test still images
-    test_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
-    test_indices = test_set.indices
-    test_img_still = test_set.dataset.data[test_indices]
-    test_img_still = nn.functional.pad(test_img_still, (padding, padding, padding, padding))
-    test_labels_still = test_set.dataset.targets[test_indices]
-    still_img_dataset = data.TensorDataset(test_img_still, test_labels_still)
-    test_still_img_loader = data.DataLoader(still_img_dataset, batch_size=config['batch_size'],
-                                            num_workers=config['num_workers'], pin_memory=config['pin_mem'],
-                                            shuffle=True)
+        train_loader = train_still_img_loader
 
     # %%
     ###########################
@@ -159,7 +158,7 @@ if __name__ == '__main__':
         elif arch_type == 'FcDHPC_hippo':
             rf_sizes = config['rf_sizes']
             wbconfig.rf_sizes = rf_sizes
-            net = FcDHPC_hippo(arch,  infrates, lr=lr, act_func=config['act_func'], device=device, dtype=dtype)
+            net = FcDHPC_hippo(arch, infrates, lr=lr, act_func=config['act_func'], device=device, dtype=dtype)
         else:
             raise TypeError('network architecture not specified')
         net.to(device)
@@ -264,7 +263,8 @@ if __name__ == '__main__':
                 label_train = torch.concat(label_train).numpy()
 
                 # generate rdm with train reps
-                fig_train = rdm_w_rep_title(rep_train, label_train, 'cosine', 'RDM of training sequence representations')
+                fig_train = rdm_w_rep_title(rep_train, label_train, 'cosine',
+                                            'RDM of training sequence representations')
                 wandb.log({'rdm train data': wandb.Image(fig_train)})
 
                 # get error on single frames
@@ -298,7 +298,8 @@ if __name__ == '__main__':
                 rep_still_labels = torch.concat(rep_still_labels).numpy()  # labels
 
                 # generate rdm with still test reps
-                fig_test_still = rdm_w_rep_title(rep_still_test, rep_still_labels, 'cosine', 'RDM of still test image representations')
+                fig_test_still = rdm_w_rep_title(rep_still_test, rep_still_labels, 'cosine',
+                                                 'RDM of still test image representations')
                 wandb.log({'rdm test still data': wandb.Image(fig_test_still)})
 
                 # assess clustering
@@ -340,7 +341,8 @@ if __name__ == '__main__':
                     seq_label_test = torch.concat(seq_label_test).numpy()
 
                     # generate rdm with train reps
-                    fig_test = rdm_w_rep_title(seq_rep_test, seq_label_test, 'cosine', 'RDM of test sequence representations')
+                    fig_test = rdm_w_rep_title(seq_rep_test, seq_label_test, 'cosine',
+                                               'RDM of test sequence representations')
                     wandb.log({'rdm test seq': wandb.Image(fig_test)})
 
                     # assess generalisation using all seq reps , use two types of classifiers
@@ -467,3 +469,24 @@ if __name__ == '__main__':
         # %%
         with open(trained_model_dir + test_name + 'training_metrics_log.pkl', 'wb') as f:
             pickle.dump(log, f)
+
+        # %%
+        # generate and save representations for later evaluation
+        # need three dataframes in total: seq representations, frame representations, still representations
+        # each contain representations generated from corresponding data
+        net.init_states()
+        if seq_train:
+            dataloaders = [train_loader, test_loader]
+            dataloaders_still = [train_still_img_loader, test_still_img_loader]
+            seq_reps = generate_reps(net, dataloaders, inference_steps, resetPerFrame=False)
+            frame_reps = generate_reps(net, dataloaders, inference_steps, resetPerFrame=True)
+            still_reps = generate_reps(net, dataloaders_still, inference_steps, resetPerFrame=True)
+            seq_reps.to_pickle(os.path.join(trained_model_dir + 'seq_rep.pkl'))
+            frame_reps.to_pickle(os.path.join(trained_model_dir + 'frame_rep.pkl'))
+            still_reps.to_pickle(os.path.join(trained_model_dir + 'still_rep.pkl'))
+        else:
+            dataloaders = [train_loader, test_still_img_loader]
+            still_reps = generate_reps(net, dataloaders, inference_steps, resetPerFrame=True)
+            still_reps.to_pickle(os.path.join(trained_model_dir + 'still_rep.pkl'))
+
+

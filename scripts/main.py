@@ -2,6 +2,7 @@
 import pickle
 
 import wandb
+from torch import nn
 
 wandb.login(key='25f10546ef384a6f1ab9446b42d7513024dea001')
 
@@ -83,6 +84,7 @@ if __name__ == '__main__':
     def stilldataset_to_dataloader(still_tensordataset):
         idx = still_tensordataset.indices
         img = still_tensordataset.dataset.data[idx]
+        img = nn.functional.pad(img, (padding, padding, padding, padding))
         label = still_tensordataset.dataset.targets[idx]
         dataset = data.TensorDataset(img, label)
         loader = data.DataLoader(dataset, batch_size=config['batch_size'],

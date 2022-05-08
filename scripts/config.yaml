@@ -12,7 +12,7 @@ padding_size: 8
 
 # network hyperparameters
 epochs: 40
-infsteps: 250
+infsteps: 200
 infrates: [.05, .05, .03, .03]
 network_size: [1936, 2500, 800, 100]
 learning_rate: .001

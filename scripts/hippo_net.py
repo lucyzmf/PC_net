@@ -114,7 +114,7 @@ class output_layer_hippo(FCLayer):
     # Additional class for last layer. This layer requires a different inference step as no top-down predictions exist.
     def forward(self, bu_errors, r_act):
         r_act = r_act + self.infRate * bu_errors
-        r_act = torch.exp(r_act) / torch.sum(torch.exp(r_act))
+        # r_act = torch.exp(r_act) / torch.sum(torch.exp(r_act))
         r_out = self.actFunc(r_act)
         return r_act, r_out
 

@@ -75,49 +75,49 @@ if __name__ == '__main__':
     reset_per_frame = config['reset_per_frame']
 
     # set up test name
-    test_name = 'datasetsize_genacc' + str(reset_per_frame) + '_seqtrain' + str(seq_train)
+    test_name = 'datasetsize_10classgenacc' + str(reset_per_frame) + '_seqtrain' + str(seq_train)
     print(test_name)
 
-    # load train data
+
+    # load datasets
+    def stilldataset_to_dataloader(still_tensordataset):
+        idx = still_tensordataset.indices
+        img = still_tensordataset.dataset.data[idx]
+        img = nn.functional.pad(img, (padding, padding, padding, padding))
+        label = still_tensordataset.dataset.targets[idx]
+        dataset = data.TensorDataset(img, label)
+        loader = data.DataLoader(dataset, batch_size=config['batch_size'],
+                                 num_workers=config['num_workers'], pin_memory=config['pin_mem'], shuffle=True)
+
+        return loader
+
+
+    # load train still data
+    train_set_still = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
+    train_still_img_loader = stilldataset_to_dataloader(train_set_still)
+    # load test still images
+    test_set_still = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
+    test_still_img_loader = stilldataset_to_dataloader(test_set_still)
+
+    # load train seq data
     if seq_train:
         train_set = torch.load(
             os.path.join(config['dataset_dir'], str(dataset) + 'train_set_' + str(morph_type) + '.pt'))
+        # load test data
+        test_set = torch.load(
+            os.path.join(config['dataset_dir'], str(dataset) + 'test_set_' + str(morph_type) + '.pt'))
         if reset_per_frame:  # if reset per frame, shuffle spin dataset
             train_loader = data.DataLoader(train_set, batch_size=batchSize, num_workers=n_workers,
                                            pin_memory=pin_mem, shuffle=True)
+            test_loader = data.DataLoader(test_set, batch_size=batchSize, num_workers=n_workers,
+                                          pin_memory=pin_mem, shuffle=True)
         else:
             train_loader = data.DataLoader(train_set, batch_size=batchSize, num_workers=n_workers,
                                            pin_memory=pin_mem, shuffle=False)
+            test_loader = data.DataLoader(test_set, batch_size=batchSize, num_workers=n_workers,
+                                          pin_memory=pin_mem, shuffle=False)
     else:
-        train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
-        train_indices = train_set.indices
-        train_img_still = train_set.dataset.data[train_indices]
-        train_img_still = nn.functional.pad(train_img_still, (padding, padding, padding, padding))
-        train_labels_still = train_set.dataset.targets[train_indices]
-        train_still_img_dataset = data.TensorDataset(train_img_still, train_labels_still)
-        train_loader = data.DataLoader(train_still_img_dataset, batch_size=config['batch_size'],
-                                       num_workers=config['num_workers'], pin_memory=config['pin_mem'], shuffle=True)
-
-    # load test data
-    test_set = torch.load(
-        os.path.join(config['dataset_dir'], str(dataset) + 'test_set_' + str(morph_type) + '.pt'))
-    if reset_per_frame:
-        test_loader = data.DataLoader(test_set, batch_size=batchSize, num_workers=n_workers,
-                                      pin_memory=pin_mem, shuffle=True)
-    else:
-        test_loader = data.DataLoader(test_set, batch_size=batchSize, num_workers=n_workers,
-                                      pin_memory=pin_mem, shuffle=False)
-
-    # load test still images
-    test_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtest_image.pt'))
-    test_indices = test_set.indices
-    test_img_still = test_set.dataset.data[test_indices]
-    test_img_still = nn.functional.pad(test_img_still, (padding, padding, padding, padding))
-    test_labels_still = test_set.dataset.targets[test_indices]
-    still_img_dataset = data.TensorDataset(test_img_still, test_labels_still)
-    test_still_img_loader = data.DataLoader(still_img_dataset, batch_size=config['batch_size'],
-                                            num_workers=config['num_workers'], pin_memory=config['pin_mem'],
-                                            shuffle=True)
+        train_loader = train_still_img_loader
 
     # %%
     ###########################
@@ -173,6 +173,7 @@ if __name__ == '__main__':
         last_layer_act_log = []
         clustering_acc = []
         test_acc_history_reg = []  # acc on test set at the end of each epoch
+        gen_still_log = []
         # test_acc_history_knn = []
         best_gen_acc = 0
 
@@ -314,6 +315,7 @@ if __name__ == '__main__':
                 # assess generalisation that applies to both conditions
                 # classification acc on still train reps and test still images
                 _, acc_still_test_reg = linear_regression(rep_train, label_train, rep_still_test, rep_still_labels)
+                gen_still_log.append(acc_still_test_reg)
                 print('generalisation: linear regression on still test images: %.4f' % acc_still_test_reg)
 
                 # _, acc_still_test_knn = knn_classifier(rep_train, label_train, rep_still_test, rep_still_labels)
@@ -462,8 +464,30 @@ if __name__ == '__main__':
         # %%
         # save gen acc log
         log['genAccReg'] = test_acc_history_reg
+        log['genAccStillImg'] = gen_still_log
         # log['genAccKnn'] = test_acc_history_knn
 
         # %%
         with open(trained_model_dir + test_name + 'training_metrics_log.pkl', 'wb') as f:
             pickle.dump(log, f)
+
+        # %%
+        # generate and save representations for later evaluation
+        # need three dataframes in total: seq representations, frame representations, still representations
+        # each contain representations generated from corresponding data
+        net.init_states()
+        if seq_train:
+            dataloaders = [train_loader, test_loader]
+            dataloaders_still = [train_still_img_loader, test_still_img_loader]
+            seq_reps = generate_reps(net, dataloaders, inference_steps, resetPerFrame=False)
+            frame_reps = generate_reps(net, dataloaders, inference_steps, resetPerFrame=True)
+            still_reps = generate_reps(net, dataloaders_still, inference_steps, resetPerFrame=True)
+            seq_reps.to_pickle(os.path.join(trained_model_dir + 'seq_rep.pkl'))
+            frame_reps.to_pickle(os.path.join(trained_model_dir + 'frame_rep.pkl'))
+            still_reps.to_pickle(os.path.join(trained_model_dir + 'still_rep.pkl'))
+        else:
+            dataloaders = [train_loader, test_still_img_loader]
+            still_reps = generate_reps(net, dataloaders, inference_steps, resetPerFrame=True)
+            still_reps.to_pickle(os.path.join(trained_model_dir + 'still_rep.pkl'))
+
+

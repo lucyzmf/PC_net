@@ -14,7 +14,7 @@ padding_size: 8
 epochs: 40
 infsteps: 1800
 infrates: [.05, .05, .03, .03]
-network_size: [1936, 2500, 800, 100]
+network_size: [1936, 4000, 2000, 500]
 learning_rate: .001
 act_func: sigmoid  # relu, sigmoid
 per_seq_repeat: 1
@@ -27,8 +27,8 @@ n_channels: [32, 64, 128]
 
 # used to generate morphing dataset
 frame_per_sequence: 9
-seq_train: False  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
-reset_per_frame: True
+seq_train: True  # whether to train network on seq, if true load dataloader of seqences, and log representation at end of sequences during training for classification
+reset_per_frame: False
 morph_type: spin
 reg_strength: .01
 reg_type: l2

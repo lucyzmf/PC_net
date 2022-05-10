@@ -14,7 +14,7 @@ padding_size: 8
 epochs: 40
 infsteps: 500
 infrates: [.07, .07, .05, .05]
-network_size: [1936, 4000, 2000, 500]
+network_size: [1936, 2500, 800, 100]
 learning_rate: .001
 act_func: sigmoid  # relu, sigmoid
 per_seq_repeat: 1

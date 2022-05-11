@@ -220,17 +220,17 @@ if __name__ == '__main__':
                 net.learn()
                 errors.append(net.total_error())
 
-                if (i + 1) % 5 == 0:  # log at the end of each sequence
+                if (i + 1) % 360 == 0:  # log at the end of 40 sequences
                     last_layer_act.append(torch.mean(net.states['r_output'][-1].detach().cpu()))
                     wandb.log({
-                        'last layer activation distribution': wandb.Histogram(
-                            net.states['r_activation'][-1].detach().cpu()),
+                        # 'last layer activation distribution': wandb.Histogram(
+                        #     net.states['r_activation'][-1].detach().cpu()),
                         'last layer output distribution': wandb.Histogram(
                             net.states['r_output'][-1].detach().cpu()),
                         'layer n-1 weights': wandb.Histogram(net.layers[-2].weights.detach().cpu()),
                         'layer n-1 output distribution': wandb.Histogram(net.states['r_output'][-2].detach().cpu()),
                         'layer n-1 error activation': wandb.Histogram(net.states['error'][-2].detach().cpu()),
-                        'layer 0 error activation': wandb.Histogram(net.states['error'][0].detach().cpu())
+                        # 'layer 0 error activation': wandb.Histogram(net.states['error'][0].detach().cpu())
                     })
 
                 if (seq_train and not reset_per_frame) and (

@@ -259,8 +259,6 @@ if __name__ == '__main__':
 
             if (epoch % 10 == 0) or (epoch == epochs - 1):  # evaluation every 10 epochs
                 # organise reps logged during training
-                rep_train = np.array(rep_train)
-                label_train = np.array(label_train)
                 train_reps_dataset = data.TensorDataset(torch.tensor(rep_train), torch.tensor(label_train))
                 torch.save(train_reps_dataset, trained_model_dir + 'epoch' + str(epoch) + 'train_rep.pt')
                 rep_train = np.vstack(rep_train)
@@ -296,8 +294,6 @@ if __name__ == '__main__':
                 })
 
                 # organise arrays logging reps for test still imgs
-                rep_still_test = np.array(rep_still_test)
-                rep_still_labels = np.array(rep_still_labels)
                 still_reps_dataset = data.TensorDataset(torch.tensor(rep_still_test), torch.tensor(rep_still_labels))
                 torch.save(still_reps_dataset, trained_model_dir + 'epoch' + str(epoch) + 'test_still_reps.pt')
                 rep_still_test = np.vstack(rep_still_test)  # representations
@@ -346,8 +342,6 @@ if __name__ == '__main__':
                             seq_label_test.append(_label)
                             net.init_states()
                     # convert arrays
-                    seq_rep_test = np.array(seq_rep_test)
-                    seq_label_test = np.array(seq_rep_test)
                     seq_reps_dataset = data.TensorDataset(torch.tensor(seq_rep_test), torch.tensor(seq_label_test))
                     torch.save(seq_reps_dataset, trained_model_dir + 'epoch' + str(epoch) + 'seq_rep_test.pt')
                     seq_rep_test = np.vstack(seq_rep_test)

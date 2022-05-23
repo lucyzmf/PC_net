@@ -194,19 +194,16 @@ def within_sample_classification_stratified(representations, labels):
 # %%
 # generate rdm with representations
 
-def rdm_w_rep(representations, labels, metric_type, istrain):  # inputs here are unordered
+def rdm_w_rep(representations, labels, metric_type, ticklabel, title):  # inputs here are unordered
     idx = np.argsort(labels)
     representations = representations[idx]
     pair_dist_cosine = pairwise_distances(representations, metric=metric_type)
 
     fig, ax = plt.subplots()
-    im = ax.imshow(pair_dist_cosine)
-    fig.colorbar(im, ax=ax)
-    if istrain:
-        ax.set_title('RDM cosine train data')
-    else:
-        ax.set_title('RDM cosine test data')
-    plt.show()
+    sns.heatmap(pair_dist_cosine, xticklabels=ticklabel, yticklabels=ticklabel, ax=ax, cmap='viridis')
+    # fig.colorbar(im, ax=ax)
+    ax.set_title(title)
+    # plt.show()
 
     return fig
 
@@ -227,10 +224,10 @@ def rdm_w_rep_title(representations, labels, metric_type, title):
 
 
 # %%
-def plot_tsne(reps, labels):
+def plot_tsne(reps, labels, title):
     print('tSNE clustering')
     time_start = time.time()
-    tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=500)
+    tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=400)
     tsne_results = tsne.fit_transform(np.vstack(reps))
     print('t-SNE done! Time elapsed: {} seconds'.format(time.time() - time_start))
     #
@@ -240,7 +237,8 @@ def plot_tsne(reps, labels):
     df['tsne-one'] = tsne_results[:, 0]
     df['tsne-two'] = tsne_results[:, 1]
     df['y'] = labels
-    fig, ax1 = plt.subplots(figsize=(10, 8))
+    fig, ax1 = plt.subplots(figsize=(7, 5))
+    sns.despine()
     sns.scatterplot(
         x="tsne-one", y="tsne-two",
         hue="y",
@@ -251,8 +249,11 @@ def plot_tsne(reps, labels):
         ax=ax1
     )
 
-    plt.show()
+    h, _ = ax1.get_legend_handles_labels()
+    ax1.legend(h, ['T-shirt/top', 'Trouser', 'Dress', 'Sneaker', 'Bag'], frameon=False)
+    plt.title(title)
 
+    return fig
 
 # %%
 from sklearn.preprocessing import StandardScaler
@@ -336,3 +337,58 @@ def generate_reps(model, _dataloaders, infSteps, resetPerFrame):
     df_rep['labels'] = labels
 
     return df_rep
+
+# %%
+def get_layer_gen_acc(dataframe, _layer):
+    acc_train, acc_test = linear_regression(
+        np.vstack(dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['r_out'].to_numpy()),
+        dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['labels'].to_numpy(),
+        np.vstack(dataframe[dataframe['is_train'] == 0][dataframe['layer'] == _layer][
+                      'r_out'].to_numpy()),
+        dataframe[dataframe['is_train'] == 0][dataframe['layer'] == _layer]['labels'].to_numpy()
+    )
+    return acc_train, acc_test
+
+
+# %%
+def get_layer_clustering(dataframe, _layer):
+    cum_acc = within_sample_classification_stratified(
+        np.vstack(dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['r_out'].to_numpy()),
+        dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['labels'].to_numpy())
+
+    return cum_acc
+
+# %%
+def generate_acc_df(rep_df, conditions_code, condition_name, isGen):  # conditions include a list that codes the conditions
+    acc = []
+    accIsTest = []  # train 0, test 1
+    conditions_log = []
+    by_layer = []
+
+    for m in range(len(rep_df)):
+        for i in range(4):
+            if isGen:
+                train, test = get_layer_gen_acc(rep_df[m], i)
+                acc.append(train)
+                accIsTest.append(0)
+                by_layer.append(i)
+                conditions_log.append(conditions_code[m])
+
+                acc.append(test)
+                accIsTest.append(1)
+                by_layer.append(i)
+                conditions_log.append(conditions_code[m])
+            else:
+                by_layer.append(i)
+                conditions_log.append(conditions_code[m])
+                acc.append(get_layer_clustering(rep_df[m], i))
+
+
+    df_acc = pd.DataFrame()
+    df_acc['acc'] = acc
+    df_acc['layer'] = by_layer
+    df_acc[condition_name] = conditions_log
+    if isGen:
+        df_acc['accIsTest'] = accIsTest
+
+    return df_acc

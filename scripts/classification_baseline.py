@@ -1,12 +1,7 @@
 # this script returns the baseline classification acc on images of dataset
 # contains three different classification methods: knn, pure linear classifier, and logistic regression
 
-import pandas
 import torch.profiler
-from torch import nn
-from torch.autograd import Variable
-from torch.utils import data
-from torch.utils.data import DataLoader
 
 from evaluation import *
 
@@ -29,8 +24,8 @@ def load_config(config_name):
         config = yaml.safe_load(file)
     return config
 
-file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_9')
-dataDir = '/40_10perclass_largerangle/'
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_10')
+dataDir = '/trainesize160perclass'
 
 config = load_config("config.yaml")
 
@@ -38,7 +33,7 @@ padding = config['padding_size']
 data_width = 28 + padding * 2
 num_classes = 10
 
-
+raise Exception('j')
 # %%
 # load images
 # train_set = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_image.pt'))
@@ -66,12 +61,6 @@ test_labels = test_set.dataset.targets[test_indices].numpy()
 print('Assess how clustered train still images are')
 acc_train_still = within_sample_classification_stratified(train_images, train_labels)
 print('within-sample linear regression (stratified kfold) on train still images: %.4f' % acc_train_still)
-
-# %%
-print('Assess how generalisable linear classifiers (regression and knn) are on still images')
-# acc of linear classifier on images
-_, acc_knn = knn_classifier(train_images, train_labels, test_images, test_labels)
-print('knn classifier test acc on still images %.4f' % acc_knn)
 
 
 # %%
@@ -141,7 +130,7 @@ labels_all = np.concatenate((train_labels, test_labels))
 # use clustering technique on flattened images to examine baseline clusters of dataset
 print('tSNE clustering')
 time_start = time.time()
-tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=1000)
+tsne = TSNE(n_components=2, verbose=0, perplexity=40, n_iter=400)
 tsne_results = tsne.fit_transform(images_all)
 print('t-SNE done! Time elapsed: {} seconds'.format(time.time() - time_start))
 
@@ -151,7 +140,8 @@ df = pandas.DataFrame()
 df['tsne-one'] = tsne_results[:, 0]
 df['tsne-two'] = tsne_results[:, 1]
 df['y'] = labels_all
-fig, ax1 = plt.subplots(figsize=(10, 8))
+fig, ax1 = plt.subplots(figsize=(7, 5))
+sns.despine()
 sns.scatterplot(
     x="tsne-one", y="tsne-two",
     hue="y",
@@ -162,7 +152,9 @@ sns.scatterplot(
     ax=ax1
 )
 
-plt.title('tSNE clustering baseline on fashionMNIST images ')
+h, _ = ax1.get_legend_handles_labels()
+ax1.legend(h, ['T-shirt/top', 'Trouser', 'Dress', 'Sneaker', 'Bag'], frameon=False)
+plt.title('tSNE clustering baseline on sampled fashionMNIST images ')
 plt.show()
 # fig.savefig(os.path.join(config['dataset_dir'], 'tSNE_clustering_rep'))
 # fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'tSNE_clustering_rep'))
@@ -258,10 +250,13 @@ images = np.concatenate((train_images, test_images))
 
 pair_dist_cosine = pairwise_distances(images, metric='cosine')
 
+# %%
+# plot just train or test
 fig, ax = plt.subplots()
-im = ax.imshow(pair_dist_cosine)
-fig.colorbar(im, ax=ax)
-ax.set_title('RDM cosine of train and test images (sorted by class within each dataset)')
+sns.despine()
+sns.heatmap(pair_dist_cosine[800:, 800:], xticklabels=40, yticklabels=40, cmap='viridis')
+# fig.colorbar(im, ax=ax)
+ax.set_title('RDM cosine of test images')
 plt.show()
 # fig.savefig(os.path.join(config['dataset_dir'], 'RDM coscience of train images'))
 # fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of train images'))
@@ -288,11 +283,20 @@ seq_frames = seq_frames[seq_indices]
 fig, axs = plt.subplots(1, config['frame_per_sequence'], sharey=True, figsize=(20, 5))
 for i in range(config['frame_per_sequence']):
     axs[i].imshow(plotting[i+279])
+plt.tight_layout()
 plt.show()
 # fig.savefig(os.path.join(config['dataset_dir'], 'example sequence in training set'))
 # fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'example sequence in training set'))
 
-
+# %%
+# example sequence small spin
+train_seq_spin_sm = torch.load(os.path.join(file_path+dataDir, 'fashionMNISTtrain_set_spin_sm.pt'))
+ex_seq, _ = train_seq_spin_sm[90:99]
+fig, axs = plt.subplots(1, config['frame_per_sequence'], sharey=True, figsize=(20, 5))
+for i in range(config['frame_per_sequence']):
+    axs[i].imshow(torch.flatten(ex_seq[i], start_dim=1))
+plt.tight_layout()
+plt.show()
 
 # %%
 # rdm of one sequence
@@ -323,8 +327,8 @@ plt.show()
 # rdm of all classes of sequences
 pair_dist_cosine = pairwise_distances(seq_frames, metric='cosine')
 fig, ax = plt.subplots()
-im = ax.imshow(pair_dist_cosine)
-fig.colorbar(im, ax=ax)
+sns.despine()
+sns.heatmap(pair_dist_cosine)
 ax.set_title('RDM cosine of frames all classes in training set')
 plt.show()
 # fig.savefig(os.path.join(config['dataset_dir'], 'RDM cosine of frames all classes in training set'))

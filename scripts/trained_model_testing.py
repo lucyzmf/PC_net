@@ -154,25 +154,6 @@ if config['architecture'] == 'FcDHPC':
 #                             act_func=config['act_func'],
 #                             device=device, dtype=dtype)
 
-# %%
-def get_layer_gen_acc(dataframe, _layer):
-    acc_train, acc_test = linear_regression(
-        np.vstack(dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['r_out'].to_numpy()),
-        dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['labels'].to_numpy(),
-        np.vstack(dataframe[dataframe['is_train'] == 0][dataframe['layer'] == _layer][
-                      'r_out'].to_numpy()),
-        dataframe[dataframe['is_train'] == 0][dataframe['layer'] == _layer]['labels'].to_numpy()
-    )
-    return acc_train, acc_test
-
-
-# %%
-def get_layer_clustering(dataframe, _layer):
-    cum_acc = within_sample_classification_stratified(
-        np.vstack(dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['r_out'].to_numpy()),
-        dataframe[dataframe['is_train'] == 1][dataframe['layer'] == _layer]['labels'].to_numpy())
-
-    return cum_acc
 
 
 # %%
@@ -263,39 +244,6 @@ linear_regression(sigmoid(torch.flatten(torch.tensor(train_seq_spin), start_dim=
 ##################
 
 # compare sets of reps
-def generate_acc_df(rep_df, conditions_code, condition_name, isGen):  # conditions include a list that codes the conditions
-    acc = []
-    accIsTest = []  # train 0, test 1
-    conditions_log = []
-    by_layer = []
-
-    for m in range(len(rep_df)):
-        for i in range(4):
-            if isGen:
-                train, test = get_layer_gen_acc(rep_df[m], i)
-                acc.append(train)
-                accIsTest.append(0)
-                by_layer.append(i)
-                conditions_log.append(conditions_code[m])
-
-                acc.append(test)
-                accIsTest.append(1)
-                by_layer.append(i)
-                conditions_log.append(conditions_code[m])
-            else:
-                by_layer.append(i)
-                conditions_log.append(conditions_code[m])
-                acc.append(get_layer_clustering(rep_df[m], i))
-
-
-    df_acc = pd.DataFrame()
-    df_acc['acc'] = acc
-    df_acc['layer'] = by_layer
-    df_acc[condition_name] = conditions_log
-    if isGen:
-        df_acc['accIsTest'] = accIsTest
-
-    return df_acc
 
 
 # %%

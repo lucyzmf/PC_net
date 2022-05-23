@@ -36,6 +36,7 @@ padding = config['padding_size']
 data_width = 28 + padding * 2
 num_classes = config['num_classes']
 
+# raise Exception('pause')
 # download data
 if dataset == 'MNIST':
     full_dataset = torchvision.datasets.MNIST(
@@ -82,11 +83,15 @@ torch.save(train_dataset, os.path.join(data_dir, str(dataset) + 'train_image.pt'
 torch.save(test_dataset, os.path.join(data_dir, str(dataset) + 'test_image.pt'))
 
 # %%
+train_dataset = torch.load('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_10/trainesize160perclass/fashionMNISTtrain_image.pt')
+test_dataset = torch.load('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_10/trainesize160perclass/fashionMNISTtest_image.pt')
+
+# %%
 ##########################
 # spinning sequences
 ##########################
 # iterate through train and test dataset samples to generate spinning sequences
-anticlockwise_deg = [-40, -30, -20, -10, 0, 10, 20, 30, 40]  # the degrees of rotation for each frame in seq
+anticlockwise_deg = [-20, -15, -10, -5, 0, 5, 10, 15, 20]  # the degrees of rotation for each frame in seq
 clockwise_deg = np.flip(anticlockwise_deg)
 degrees = np.vstack((clockwise_deg, anticlockwise_deg))
 
@@ -148,6 +153,10 @@ train_set_spin = data.TensorDataset(train_x, train_y)
 # train_loader_spin = data.DataLoader(train_set_spin, batch_size=batchSize, num_workers=n_workers, pin_memory=pin_mem)
 test_set_spin = data.TensorDataset(test_x, test_y)
 # test_loader_spin = data.DataLoader(test_set_spin, batch_size=batchSize, num_workers=n_workers, pin_memory=pin_mem)
+
+# %%
+# torch.save(train_set_spin, os.path.join(data_dir, str(dataset) + 'train_set_spin.pt'))
+# torch.save(test_set_spin, os.path.join(data_dir, str(dataset) + 'test_set_spin.pt'))
 
 torch.save(train_set_spin, os.path.join(data_dir, str(dataset) + 'train_set_spin.pt'))
 torch.save(test_set_spin, os.path.join(data_dir, str(dataset) + 'test_set_spin.pt'))

@@ -18,7 +18,7 @@ disconti_morph_log = pd.read_pickle(
 conti_nomorph_log = pd.read_pickle(glob(os.path.join(filedir, 'continuous_nomorph/trained_model/*metrics_log.pkl'))[0])
 still_control_log = pd.read_pickle(glob(os.path.join(filedir, 'still_control/trained_model/*metrics_log.pkl'))[0])
 
-# raise Exception('stop')
+raise Exception('stop')
 
 # %%
 epochs = []
@@ -62,7 +62,7 @@ still_rep_continomorph = pd.read_pickle(glob(os.path.join(filedir, 'continuous_n
 still_rep_stillcontrol = pd.read_pickle(glob(os.path.join(filedir, 'still_control/**/still_rep.pkl'))[0])
 
 # %%
-df_genacc_morph = generate_acc_df([seq_rep_contimorph, still_rep_continomorph, still_rep_stillcontrol], [0, 1, 2],
+df_genacc_morph = generate_acc_df([seq_rep_contimorph, still_rep_continomorph], [0, 1],
                                   'morph_or_no_morph', isGen=True)
 
 # %%
@@ -85,7 +85,7 @@ plt.axhline(y=.455, linestyle='dashed', color='black', label='linear classificat
 plt.axhline(y=0.8894, linestyle='dotted', color='black', label='linear classification with seq data')
 h, _ = ax.get_legend_handles_labels()
 ax.legend(h, ['classification with sampled fashion MNIST', 'classification with seq data',
-              'morph reps', 'no morph reps', 'still control reps', ], frameon=False, loc='upper center',
+              'morph reps', 'no morph reps', ], frameon=False, loc='upper center',
           bbox_to_anchor=(0.5, -.1), ncol=2)
 plt.tight_layout()
 
@@ -101,7 +101,7 @@ fig1 = rdm_w_rep(np.vstack(
     seq_rep_contimorph[seq_rep_contimorph['is_train'] == isTrain][seq_rep_contimorph['layer'] == 3]['r_out'].to_numpy()),
     seq_rep_contimorph[seq_rep_contimorph['is_train'] == isTrain][seq_rep_contimorph['layer'] == 3][
         'labels'].to_numpy(),
-    'cosine', ticklabel=160, title='continuous morph test reps')
+    'cosine', ticklabel=640, title='continuous morph train reps')
 plt.show()
 # %%
 fig2 = rdm_w_rep(np.vstack(
@@ -109,20 +109,82 @@ fig2 = rdm_w_rep(np.vstack(
         'r_out'].to_numpy()),
     still_rep_continomorph[still_rep_continomorph['is_train'] == isTrain][still_rep_continomorph['layer'] == 3][
         'labels'].to_numpy(),
-    'cosine', ticklabel=40, title='continuous no morph test reps')
+    'cosine', ticklabel=160, title='continuous no morph train reps')
 plt.show()
 plt.close()
 
 # %%
 # rdm from still control
+isTrain = 1
 fig3 = rdm_w_rep(np.vstack(
     still_rep_stillcontrol[still_rep_stillcontrol['is_train'] == isTrain][still_rep_stillcontrol['layer'] == 3][
         'r_out'].to_numpy()),
     still_rep_stillcontrol[still_rep_stillcontrol['is_train'] == isTrain][still_rep_stillcontrol['layer'] == 3][
         'labels'].to_numpy(),
-    'cosine', ticklabel=40, title='continuous no morph test reps')
+    'cosine', ticklabel=160, title='still control test reps')
 plt.show()
 plt.close()
+
+# %%
+# compute mean distance for within and between class
+# contimorph
+dist_contimorph = cosine_dis(np.vstack(
+    seq_rep_contimorph[seq_rep_contimorph['layer'] == 3]['r_out'].to_numpy()),
+    seq_rep_contimorph[seq_rep_contimorph['layer'] == 3][
+        'labels'].to_numpy(),
+    'cosine')
+
+mean_dis_class_contimorph = np.zeros((5, 5))
+for i in range(5):
+    for j in range(5):
+        mean_dis_class_contimorph[i, j] = dist_contimorph[i*800:(i+1)*800, j*800:(j+1)*800].mean()
+
+sns.heatmap(mean_dis_class_contimorph, annot=True, vmax=1.0, vmin=0)
+plt.xlabel('mean within class distance: %.3f, mean between class distance: %.3f' % (
+        np.sum(np.identity(5)*mean_dis_class_contimorph)/5,
+        np.sum((np.ones((5, 5))-np.identity(5))*mean_dis_class_contimorph)/20))
+plt.show()
+
+# %%
+# continomorph
+dist_continomorph = cosine_dis(np.vstack(
+    still_rep_continomorph[still_rep_continomorph['layer'] == 3][
+        'r_out'].to_numpy()),
+    still_rep_continomorph[still_rep_continomorph['layer'] == 3][
+        'labels'].to_numpy(),
+    'cosine')
+
+mean_dist_class_continomorph = np.zeros((5, 5))
+for i in range(5):
+    for j in range(5):
+        mean_dist_class_continomorph[i, j] = np.mean(dist_continomorph[i*200:(i+1)*200, j*200:(j+1)*200])
+
+sns.heatmap(mean_dist_class_continomorph, annot=True, vmax=1.0, vmin=0)
+plt.xlabel('mean within class distance: %.3f, mean between class distance: %.3f' % (
+        np.sum(np.identity(5)*mean_dist_class_continomorph)/5,
+        np.sum((np.ones((5, 5))-np.identity(5))*mean_dist_class_continomorph)/20))
+plt.show()
+
+# %%
+# still control
+dist_stillcontrol = cosine_dis(np.vstack(
+    still_rep_stillcontrol[still_rep_stillcontrol['layer'] == 3][
+        'r_out'].to_numpy()),
+    still_rep_stillcontrol[still_rep_stillcontrol['layer'] == 3][
+        'labels'].to_numpy(),
+    'cosine')
+
+mean_dist_class_stillcontrol = np.zeros((5, 5))
+for i in range(5):
+    for j in range(5):
+        mean_dist_class_stillcontrol[i, j] = np.mean(dist_stillcontrol[i*200:(i+1)*200, j*200:(j+1)*200])
+
+sns.heatmap(mean_dist_class_stillcontrol, annot=True, vmax=1.0, vmin=0)
+plt.xlabel('mean within class distance: %.3f, mean between class distance: %.3f' % (
+        np.sum(np.identity(5)*mean_dist_class_stillcontrol)/5,
+        np.sum((np.ones((5, 5))-np.identity(5))*mean_dist_class_stillcontrol)/20))
+plt.show()
+
 
 # %%
 # 3. invariance from frames of a sequence for continuous morph
@@ -175,10 +237,20 @@ plt.show()
 #######################
 
 frame_rep_discontinmorph = pd.read_pickle(glob(os.path.join(filedir, 'discontinuous_morph/**/frame_rep.pkl'))[0])
-seq_rep_contimorph_sm = pd.read_pickle(glob(os.path.join(filedir, 'continuous_morph_sm/**/seq_rep.pkl'))[0])
+frame_rep_contimorph_sm = pd.read_pickle(glob(os.path.join(filedir, 'continuous_morph_sm/**/frame_rep.pkl'))[0])
+frame_rep_contimorph = pd.read_pickle(glob(os.path.join(filedir, 'continuous_morph/**/frame_rep.pkl'))[0])
 
-df_genacc_conti = generate_acc_df([seq_rep_contimorph, seq_rep_contimorph_sm, frame_rep_discontinmorph], [0, 1, 2],
+df_genacc_conti1 = generate_acc_df([frame_rep_contimorph], [0],
                                   'conti_disconti', isGen=True)
+
+df_genacc_conti2 = generate_acc_df([frame_rep_contimorph_sm], [1],
+                                  'conti_disconti', isGen=True)
+
+df_genacc_conti3 = generate_acc_df([frame_rep_discontinmorph], [2],
+                                  'conti_disconti', isGen=True)
+
+# %%
+df_genacc_conti = pd.concat([df_genacc_conti1, df_genacc_conti2, df_genacc_conti3], ignore_index=True)
 
 # %%
 # 1. decoding acc
@@ -260,6 +332,26 @@ axs[2].set_xlabel('mean cosine distance = %.3f' % (np.mean(pair_dist_cosine)))
 # plt.tight_layout()
 plt.show()
 
+# %%
+# rdm by class
+
+dist_discontimorph = cosine_dis(np.vstack(
+    frame_rep_discontinmorph[frame_rep_discontinmorph['layer'] == 3][
+        'r_out'].to_numpy()),
+    frame_rep_discontinmorph[frame_rep_discontinmorph['layer'] == 3][
+        'labels'].to_numpy(),
+    'cosine')
+
+mean_dist_class_discontimorph = np.zeros((5, 5))
+for i in range(5):
+    for j in range(5):
+        mean_dist_class_discontimorph[i, j] = np.mean(dist_discontimorph[i*7200:(i+1)*7200, j*7200:(j+1)*7200])
+
+sns.heatmap(mean_dist_class_discontimorph, annot=True, vmax=1.0, vmin=0)
+plt.xlabel('mean within class distance: %.3f, mean between class distance: %.3f' % (
+        np.sum(np.identity(5)*mean_dist_class_discontimorph)/5,
+        np.sum((np.ones((5, 5))-np.identity(5))*mean_dist_class_discontimorph)/20))
+plt.show()
 
 # %%
 #####

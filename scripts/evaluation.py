@@ -192,6 +192,14 @@ def within_sample_classification_stratified(representations, labels):
 
 
 # %%
+# compute pairwise distance matrix
+def cosine_dis(reps, labels, metric_type):
+    idx = np.argsort(labels)
+    reps = reps[idx]
+    pair_dist_cosine = pairwise_distances(reps, metric=metric_type)
+    return pair_dist_cosine
+
+# %%
 # generate rdm with representations
 
 def rdm_w_rep(representations, labels, metric_type, ticklabel, title):  # inputs here are unordered

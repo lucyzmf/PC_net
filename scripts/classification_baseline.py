@@ -1,6 +1,5 @@
 # this script returns the baseline classification acc on images of dataset
 # contains three different classification methods: knn, pure linear classifier, and logistic regression
-
 import torch.profiler
 
 from evaluation import *
@@ -262,6 +261,37 @@ plt.show()
 # fig.savefig(os.path.join('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_6/80 epochs', 'RDM coscience of train images'))
 
 # %%
+# plot train/test img rdm by class
+train = 800  # if 800 plot test img
+mean_dist_class = np.zeros((5, 5))
+for i in range(5):
+    for j in range(5):
+        mean_dist_class[i, j] = np.mean(pair_dist_cosine[train+i*40:train+(i+1)*40, train+j*40:train+(j+1)*40])
+
+sns.heatmap(mean_dist_class, annot=True, vmax=1.0, vmin=0)
+plt.xlabel('mean within class distance: %.3f, mean between class distance: %.3f' % (
+        np.sum(np.identity(5)*mean_dist_class)/5,
+        np.sum((np.ones((5, 5))-np.identity(5))*mean_dist_class)/20))
+plt.show()
+
+# %%
+# plot all img rdm by class
+idx = np.argsort(np.concatenate((train_labels, test_labels)))
+all_img = np.concatenate((train_images, test_images))[idx]
+all_img_dis = pairwise_distances(all_img, metric='cosine')
+
+mean_dist_img = np.zeros((5, 5))
+for i in range(5):
+    for j in range(5):
+        mean_dist_img[i, j] = all_img_dis[i*200:(i+1)*200, j*200:(j+1)*200].mean()
+
+sns.heatmap(mean_dist_img, annot=True, vmax=1.0, vmin=0)
+plt.xlabel('mean within class distance: %.3f, mean between class distance: %.3f' % (
+        np.sum(np.identity(5)*mean_dist_img)/5,
+        np.sum((np.ones((5, 5))-np.identity(5))*mean_dist_img)/20))
+plt.show()
+
+# %%
 # rdm of train sequences
 # train_loader_seq = torch.load(os.path.join(config['dataset_dir'], 'fashionMNISTtrain_loader_spin.pth'))
 seq_frames = []
@@ -280,9 +310,10 @@ seq_labels = seq_labels[seq_indices]
 seq_frames = seq_frames[seq_indices]
 # %%
 # example sequence
-fig, axs = plt.subplots(1, config['frame_per_sequence'], sharey=True, figsize=(20, 5))
+fig, axs = plt.subplots(config['frame_per_sequence'], 1, sharey=True, figsize=(5, 20))
 for i in range(config['frame_per_sequence']):
-    axs[i].imshow(plotting[i+279])
+    axs[i].imshow(plotting[i+9], cmap='gray')
+    axs[i].set_axis_off()
 plt.tight_layout()
 plt.show()
 # fig.savefig(os.path.join(config['dataset_dir'], 'example sequence in training set'))
@@ -291,10 +322,11 @@ plt.show()
 # %%
 # example sequence small spin
 train_seq_spin_sm = torch.load(os.path.join(file_path+dataDir, 'fashionMNISTtrain_set_spin_sm.pt'))
-ex_seq, _ = train_seq_spin_sm[90:99]
+ex_seq, _ = train_seq_spin_sm[117:126]
 fig, axs = plt.subplots(1, config['frame_per_sequence'], sharey=True, figsize=(20, 5))
 for i in range(config['frame_per_sequence']):
-    axs[i].imshow(torch.flatten(ex_seq[i], start_dim=1))
+    axs[i].imshow(torch.flatten(ex_seq[i], start_dim=1), cmap='gray')
+    axs[i].set_axis_off()
 plt.tight_layout()
 plt.show()
 
@@ -342,4 +374,31 @@ fig, ax = plt.subplots()
 sns.heatmap(pair_dist_cosine, cmap='mako')
 # fig.colorbar(im, ax=ax)
 ax.set_title('RDM cosine of frames all classes in training set')
+plt.show()
+
+# %%
+idx = np.argsort(np.concatenate((train_labels_spin, test_labels_spin)))
+sorted_frames = np.concatenate((train_seq_spin, test_seq_spin))[idx]
+
+frame_dist = pairwise_distances(sorted_frames, metric='cosine')
+
+frame_class_dist = np.zeros((5, 5))
+for i in range(5):
+    for j in range(5):
+        frame_class_dist[i, j] = frame_dist[i*7200:(i+1)*7200, j*7200:(j+1)*7200].mean()
+
+sns.heatmap(frame_class_dist, annot=True, vmax=1.0, vmin=0)
+plt.xlabel('mean within class distance: %.3f, mean between class distance: %.3f' % (
+        np.sum(np.identity(5)*frame_class_dist)/5,
+        np.sum((np.ones((5, 5))-np.identity(5))*frame_class_dist)/20))
+plt.show()
+
+# %%
+# plot 15 imgs
+fig, axs = plt.subplots(3, 5, sharex=True, sharey=True)
+for i in range(3):
+    for j in range(5):
+        axs[i, j].imshow(np.reshape(train_images[np.random.randint(800), :], (data_width, data_width)), cmap='gray')
+        axs[i, j].set_axis_off()
+plt.tight_layout()
 plt.show()

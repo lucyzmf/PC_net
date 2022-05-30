@@ -424,3 +424,9 @@ sns.lineplot(data=df_corr_gen, x='epoch', y='acc', hue='samples per class', pale
 h, _ = ax.get_legend_handles_labels()
 ax.legend(h, ['20', '40', '100', '200', '500'], frameon=False, title='samples per class')
 plt.show()
+
+# %%
+fig, ax = plt.subplots(figsize=(6, 5))
+sns.despine()
+sns.barplot(data=df_corr_gen[df_corr_gen['epoch']==40], x='samples per class', y='acc', palette='tab10')
+plt.show()

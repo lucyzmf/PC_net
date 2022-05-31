@@ -1,10 +1,7 @@
-import os
 from glob import glob
 
-import numpy as np
 import torch.cuda as cuda
 import torch.profiler
-import yaml
 from torch import nn
 from torch.utils import data
 
@@ -127,15 +124,40 @@ def get_label_np(tensordataset):
 
 
 # %%
+# get all test labels from tensor to np
 test_labels = get_label_np(test_loader)
 # %%
+# generate test reps for each network
 test_reps_20 = generate_test_reps(trainednet_20, test_loader)
-# %%
 test_reps_40 = generate_test_reps(trainednet_40, test_loader)
 test_reps_100 = generate_test_reps(trainednet_100, test_loader)
 test_reps_200 = generate_test_reps(trainednet_200, test_loader)
 test_reps_500 = generate_test_reps(trainednet_500, test_loader)
 
+# %%
+dataset_size = [20, 40, 100, 20, 500]
+gen_acc = []
 
 
+def get_gen_acc(still_rep_df, test_reps, labels):
+    _, gen_accs = linear_regression(
+        np.vstack(still_rep_df[still_rep_df['is_train'] == 1][still_rep_df['layer'] == 3]['r_out'].to_numpy()),
+        still_rep_df[still_rep_df['is_train'] == 1][still_rep_df['layer'] == 3]['labels'].to_numpy(), test_reps,
+        labels)
 
+    return gen_accs
+
+
+gen_acc_20 = get_gen_acc(still_rep_20, test_reps_20, test_labels)
+gen_acc_40 = get_gen_acc(still_rep_40, test_reps_40, test_labels)
+gen_acc_100 = get_gen_acc(still_rep_100, test_reps_100, test_labels)
+gen_acc_200 = get_gen_acc(still_rep_200, test_reps_100, test_labels)
+gen_acc_500 = get_gen_acc(still_rep_500, test_reps_500, test_labels)
+
+# %%
+df_gen = pd.DataFrame()
+df_gen['samples per class'] = dataset_size
+df_gen['acc'] = [gen_acc_20, gen_acc_40, gen_acc_100, gen_acc_200, gen_acc_500]
+
+sns.barplot(data=df_gen, x='samples per class', y='acc')
+plt.show()

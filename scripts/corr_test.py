@@ -1,14 +1,13 @@
 from glob import glob
 
-import torch.cuda as cuda
 import torch.profiler
 from torch import nn
 from torch.utils import data
 
 from evaluation import *
-from fc_net import FcDHPC
 
 filePath = '/Users/lucyzhang/Documents/research/PC_net/results/morph_test_10/correlation/'
+raise Exception('p')
 # %%
 # load saved still reps from training set
 still_rep_20 = pd.read_pickle(glob(os.path.join(filePath, '20_datasetsize*/trained_model/still_rep.pkl'))[0])
@@ -32,7 +31,7 @@ def stilldataset_to_dataloader(still_tensordataset):
     label = still_tensordataset.dataset.targets[idx]
     dataset = data.TensorDataset(img, label)
     loader = data.DataLoader(dataset, batch_size=config['batch_size'],
-                             num_workers=config['num_workers'], pin_memory=config['pin_mem'], shuffle=True)
+                             num_workers=config['num_workers'], pin_memory=config['pin_mem'], shuffle=False)
 
     return loader
 
@@ -63,42 +62,6 @@ dtype = torch.float  # Set standard datatype
 
 config = load_config("config.yaml")
 
-# %%
-# load state dict of trained networks
-trainednet_20 = FcDHPC(config['network_size'], config['infrates'], lr=config['learning_rate'],
-                       act_func=config['act_func'], device=device, dtype=dtype)
-trainednet_20.load_state_dict(torch.load(glob(os.path.join(filePath, '20_datasetsize*/trained_model/*trainingreadout'
-                                                                     '.pth'))[0],
-                                         map_location=torch.device('cpu')))
-
-# %%
-trainednet_40 = FcDHPC(config['network_size'], config['infrates'], lr=config['learning_rate'],
-                       act_func=config['act_func'], device=device, dtype=dtype)
-trainednet_40.load_state_dict(torch.load(glob(os.path.join(filePath, '40_datasetsize*/trained_model/*trainingreadout'
-                                                                     '.pth'))[0],
-                                         map_location=torch.device('cpu')))
-
-# %%
-trainednet_100 = FcDHPC(config['network_size'], config['infrates'], lr=config['learning_rate'],
-                        act_func=config['act_func'], device=device, dtype=dtype)
-trainednet_100.load_state_dict(torch.load(glob(os.path.join(filePath, '100_datasetsize*/trained_model/*trainingreadout'
-                                                                      '.pth'))[0],
-                                          map_location=torch.device('cpu')))
-
-# %%
-trainednet_200 = FcDHPC(config['network_size'], config['infrates'], lr=config['learning_rate'],
-                        act_func=config['act_func'], device=device, dtype=dtype)
-trainednet_200.load_state_dict(torch.load(glob(os.path.join(filePath, '200_datasetsize*/trained_model/*trainingreadout'
-                                                                      '.pth'))[0],
-                                          map_location=torch.device('cpu')))
-
-# %%
-trainednet_500 = FcDHPC(config['network_size'], config['infrates'], lr=config['learning_rate'],
-                        act_func=config['act_func'], device=device, dtype=dtype)
-trainednet_500.load_state_dict(torch.load(glob(os.path.join(filePath, '500_datasetsize*/trained_model/*trainingreadout'
-                                                                      '.pth'))[0],
-                                          map_location=torch.device('cpu')))
-
 
 # %%
 # generate new test rep
@@ -126,21 +89,15 @@ def get_label_np(tensordataset):
 # %%
 # get all test labels from tensor to np
 test_labels = get_label_np(test_loader)
-# %%
-# generate test reps for each network
-test_reps_20 = generate_test_reps(trainednet_20, test_loader)
-test_reps_40 = generate_test_reps(trainednet_40, test_loader)
-test_reps_100 = generate_test_reps(trainednet_100, test_loader)
-test_reps_200 = generate_test_reps(trainednet_200, test_loader)
-test_reps_500 = generate_test_reps(trainednet_500, test_loader)
 
 # %%
-dataset_size = [20, 40, 100, 20, 500]
-gen_acc = []
+# load state dict of trained networks
+trainednet = FcDHPC(config['network_size'], config['infrates'], lr=config['learning_rate'],
+                       act_func=config['act_func'], device=device, dtype=dtype)
 
 
 def get_gen_acc(still_rep_df, test_reps, labels):
-    gen_accs = linear_regression(
+    _, gen_accs = linear_regression(
         np.vstack(still_rep_df[still_rep_df['is_train'] == 1][still_rep_df['layer'] == 3]['r_out'].to_numpy()),
         still_rep_df[still_rep_df['is_train'] == 1][still_rep_df['layer'] == 3]['labels'].to_numpy(), test_reps,
         labels)
@@ -148,16 +105,50 @@ def get_gen_acc(still_rep_df, test_reps, labels):
     return gen_accs
 
 
-gen_acc_20 = get_gen_acc(still_rep_20, test_reps_20, test_labels)
-gen_acc_40 = get_gen_acc(still_rep_40, test_reps_40, test_labels)
-gen_acc_100 = get_gen_acc(still_rep_100, test_reps_100, test_labels)
-gen_acc_200 = get_gen_acc(still_rep_200, test_reps_100, test_labels)
-gen_acc_500 = get_gen_acc(still_rep_500, test_reps_500, test_labels)
+def load_and_generate(trained_net, _dataset_size, _test_loader):
+    gen_acc_list = []
+    for i in range(5):
+        trained_net.load_state_dict(torch.load(glob(os.path.join(filePath, str(_dataset_size) + '_datasetsize*/trained_model/*trainingreadout.pth'))[i],
+                                               map_location=torch.device('cpu')))
+        still_rep = pd.read_pickle(glob(os.path.join(filePath, str(_dataset_size) + '_datasetsize*/trained_model/still_rep.pkl'))[i])
+        test_reps = generate_test_reps(trained_net, _test_loader)
+        acc = get_gen_acc(still_rep, test_reps, test_labels)
+        gen_acc_list.append(acc)
+        print(gen_acc_list)
+
+    return gen_acc_list
+
+# %%
+gen_acc_20_ls = load_and_generate(trainednet, 20, test_loader)
+gen_acc_40_ls = load_and_generate(trainednet, 40, test_loader)
+gen_acc_100_ls = load_and_generate(trainednet, 100, test_loader)
+gen_acc_200_ls = load_and_generate(trainednet, 200, test_loader)
+gen_acc_500_ls = load_and_generate(trainednet, 500, test_loader)
+
+# %%
+dataset_size = np.concatenate(
+    (
+        np.full(5, 20),
+        np.full(5, 40),
+        np.full(5, 100),
+        np.full(5, 200),
+        np.full(5, 500)
+    )
+)
+gen_acc = np.concatenate((
+    gen_acc_20_ls,
+    gen_acc_40_ls,
+    gen_acc_100_ls,
+    gen_acc_200_ls,
+    gen_acc_500_ls
+))
 
 # %%
 df_gen = pd.DataFrame()
 df_gen['samples per class'] = dataset_size
-df_gen['acc'] = [gen_acc_20, gen_acc_40, gen_acc_100, gen_acc_200, gen_acc_500]
+df_gen['acc'] = gen_acc
 
+fig, ax = plt.subplots()
+sns.despine()
 sns.barplot(data=df_gen, x='samples per class', y='acc')
 plt.show()

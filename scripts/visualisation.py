@@ -35,14 +35,14 @@ total_error = np.hstack((conti_morph_log['total_error'],
                          still_control_log['total_error']))
 
 df_error_log = pd.DataFrame()
-df_error_log['total error'] = total_error
+df_error_log['error outputs'] = total_error
 df_error_log['epoch'] = np.hstack(epochs)
 df_error_log['condition'] = np.hstack(condition)
 
 # %%
 fig, ax = plt.subplots(figsize=(5, 4))
 sns.despine()
-sns.lineplot(data=df_error_log, x='epoch', y='total error', hue='condition', palette='tab10')
+sns.lineplot(data=df_error_log, x='epoch', y='error outputs', hue='condition', palette='tab10')
 h, _ = ax.get_legend_handles_labels()
 ax.legend(h, ['continuous morph', 'discontinuous morph', 'continuous no morph', 'still control'],
           bbox_to_anchor=(1, 0.5),
@@ -57,12 +57,12 @@ plt.show()
 
 # 1. decoding from representations from test set by layer
 # load rep df
-seq_rep_contimorph = pd.read_pickle(glob(os.path.join(filedir, 'continuous_morph/**/seq_rep.pkl'))[0])
+frame_rep_contimorph = pd.read_pickle(glob(os.path.join(filedir, 'continuous_morph/**/frame_rep.pkl'))[0])
 still_rep_continomorph = pd.read_pickle(glob(os.path.join(filedir, 'continuous_nomorph/**/still_rep.pkl'))[0])
 still_rep_stillcontrol = pd.read_pickle(glob(os.path.join(filedir, 'still_control/**/still_rep.pkl'))[0])
 
 # %%
-df_genacc_morph = generate_acc_df([seq_rep_contimorph, still_rep_continomorph], [0, 1],
+df_genacc_morph = generate_acc_df([frame_rep_contimorph, still_rep_continomorph], [0, 1],
                                   'morph_or_no_morph', isGen=True)
 
 # %%
@@ -428,5 +428,5 @@ plt.show()
 # %%
 fig, ax = plt.subplots(figsize=(6, 5))
 sns.despine()
-sns.barplot(data=df_corr_gen[df_corr_gen['epoch']==40], x='samples per class', y='acc', palette='tab10')
+sns.barplot(data=df_corr_gen[df_corr_gen['epoch']==40], x='samples per class', y='acc', palette='tab10', ci='sd')
 plt.show()

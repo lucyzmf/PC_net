@@ -150,5 +150,6 @@ df_gen['acc'] = gen_acc
 
 fig, ax = plt.subplots()
 sns.despine()
-sns.barplot(data=df_gen, x='samples per class', y='acc')
+sns.barplot(data=df_gen, x='samples per class', y='acc', ci='sd', capsize=.05)
+plt.tight_layout()
 plt.show()

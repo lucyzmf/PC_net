@@ -29,8 +29,8 @@ def load_config(config_name):
         config = yaml.safe_load(file)
     return config
 
-file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_9')
-dataDir = '/40_10perclass_largerangle/'
+file_path = os.path.abspath('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_10')
+dataDir = '/correlation/data200'
 
 config = load_config("config.yaml")
 

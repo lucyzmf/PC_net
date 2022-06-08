@@ -78,14 +78,15 @@ fig, ax = plt.subplots(figsize=(6, 5))
 sns.despine()
 sns.barplot(data=df_genacc_morph[df_genacc_morph['accIsTest'] == 1][df_genacc_morph['layer'] != 0], x='layer', y='acc',
             hue='morph_or_no_morph', ax=ax, palette='tab10')
-ax.set_title('generalisation acc by layer morph vs no morph')
+# ax.set_title('generalisation acc by layer morph vs no morph')
 
 # add baseline classification on input
 plt.axhline(y=.455, linestyle='dashed', color='black', label='linear classification with still data')
 plt.axhline(y=0.8894, linestyle='dotted', color='black', label='linear classification with seq data')
+plt.xlabel('area')
 h, _ = ax.get_legend_handles_labels()
 ax.legend(h, ['classification with sampled fashion MNIST', 'classification with seq data',
-              'morph reps', 'no morph reps', ], frameon=False, loc='upper center',
+              'continuous morph', 'continuous no morph', ], frameon=False, loc='upper center',
           bbox_to_anchor=(0.5, -.1), ncol=2)
 plt.tight_layout()
 
@@ -128,16 +129,18 @@ plt.close()
 # %%
 # compute mean distance for within and between class
 # contimorph
+still_rep_contimorph = pd.read_pickle(glob(os.path.join(filedir, 'continuous_morph/**/still_rep.pkl'))[0])
+# %%
 dist_contimorph = cosine_dis(np.vstack(
-    seq_rep_contimorph[seq_rep_contimorph['layer'] == 3]['r_out'].to_numpy()),
-    seq_rep_contimorph[seq_rep_contimorph['layer'] == 3][
+    still_rep_contimorph[still_rep_contimorph['layer'] == 3]['r_out'].to_numpy()),
+    still_rep_contimorph[still_rep_contimorph['layer'] == 3][
         'labels'].to_numpy(),
     'cosine')
 
 mean_dis_class_contimorph = np.zeros((5, 5))
 for i in range(5):
     for j in range(5):
-        mean_dis_class_contimorph[i, j] = dist_contimorph[i*800:(i+1)*800, j*800:(j+1)*800].mean()
+        mean_dis_class_contimorph[i, j] = dist_contimorph[i*200:(i+1)*200, j*200:(j+1)*200].mean()
 
 sns.heatmap(mean_dis_class_contimorph, annot=True, vmax=1.0, vmin=0)
 plt.xlabel('mean within class distance: %.3f, mean between class distance: %.3f' % (
@@ -239,7 +242,7 @@ plt.show()
 frame_rep_discontinmorph = pd.read_pickle(glob(os.path.join(filedir, 'discontinuous_morph/**/frame_rep.pkl'))[0])
 frame_rep_contimorph_sm = pd.read_pickle(glob(os.path.join(filedir, 'continuous_morph_sm/**/frame_rep.pkl'))[0])
 frame_rep_contimorph = pd.read_pickle(glob(os.path.join(filedir, 'continuous_morph/**/frame_rep.pkl'))[0])
-
+# %%
 df_genacc_conti1 = generate_acc_df([frame_rep_contimorph], [0],
                                   'conti_disconti', isGen=True)
 
@@ -258,14 +261,15 @@ fig, ax = plt.subplots(figsize=(6, 5))
 sns.despine()
 sns.barplot(data=df_genacc_conti[df_genacc_conti['accIsTest'] == 1][df_genacc_conti['layer'] != 0], x='layer', y='acc', hue='conti_disconti', ax=ax,
             palette='tab10')
-ax.set_title('generalisation acc by layer continuous vs discontinuous')
+# ax.set_title('generalisation acc by layer continuous vs discontinuous')
 
 # add baseline
 # add baseline classification on input
 plt.axhline(y=0.8894, linestyle='dotted', color='black', label='classification with frames')
+plt.xlabel('area')
 h, _ = ax.get_legend_handles_labels()
-ax.legend(h, ['classification with seq data', 'continuous (large spin) reps', 'continuous (small spin) reps',
-              'discontinuous (large spin) reps'], frameon=False, loc='upper center',
+ax.legend(h, ['classification with seq data', 'continuous (large rotation)', 'continuous (small rotation)',
+              'discontinuous (large rotation)'], frameon=False, loc='upper center',
           bbox_to_anchor=(0.5, -.1), ncol=2)
 plt.tight_layout()
 
@@ -372,11 +376,11 @@ fig, ax = plt.subplots(figsize=(6, 5))
 sns.despine()
 sns.barplot(data=df_genacc_stillcontivsdiconti[df_genacc_stillcontivsdiconti['accIsTest'] == 1][df_genacc_stillcontivsdiconti['layer'] != 0], x='layer', y='acc', hue='condition', ax=ax,
             palette='tab10')
-ax.set_title('generalisation acc by layer assess with still img alone between all conditions')
+# ax.set_title('generalisation acc by layer still img')
 plt.axhline(y=.455, linestyle='dashed', color='black', label='linear classification with still data')
 
 h, _ = ax.get_legend_handles_labels()
-ax.legend(h, ['classification with sampled fashion MNIST', 'still control reps', 'continuous morph reps', 'discontinuous morph', 'continuous no morph reps'], frameon=False, loc='upper center',
+ax.legend(h, ['classification with sampled fashion MNIST', 'still control', 'continuous morph', 'discontinuous morph', 'continuous no morph'], frameon=False, loc='upper center',
           bbox_to_anchor=(0.5, -.1), ncol=2)
 
 plt.tight_layout()

@@ -19,6 +19,18 @@ conti_nomorph_log = pd.read_pickle(glob(os.path.join(filedir, 'continuous_nomorp
 still_control_log = pd.read_pickle(glob(os.path.join(filedir, 'still_control/trained_model/*metrics_log.pkl'))[0])
 
 raise Exception('stop')
+# %%
+SMALL_SIZE = 8
+MEDIUM_SIZE = 10
+BIGGER_SIZE = 12
+
+plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 # %%
 epochs = []
@@ -74,7 +86,9 @@ df_genacc_morph = generate_acc_df([frame_rep_contimorph, still_rep_continomorph]
 
 # %%
 # plot acc
-fig, ax = plt.subplots(figsize=(6, 5))
+sns.set_context("paper", font_scale=1.5)
+# %%
+fig, ax = plt.subplots(figsize=(10,5))
 sns.despine()
 sns.barplot(data=df_genacc_morph[df_genacc_morph['accIsTest'] == 1][df_genacc_morph['layer'] != 0], x='layer', y='acc',
             hue='morph_or_no_morph', ax=ax, palette='tab10')
@@ -84,10 +98,11 @@ sns.barplot(data=df_genacc_morph[df_genacc_morph['accIsTest'] == 1][df_genacc_mo
 plt.axhline(y=.455, linestyle='dashed', color='black', label='linear classification with still data')
 plt.axhline(y=0.8894, linestyle='dotted', color='black', label='linear classification with seq data')
 plt.xlabel('area')
+plt.ylabel('accuracy')
 h, _ = ax.get_legend_handles_labels()
-ax.legend(h, ['classification with sampled fashion MNIST', 'classification with seq data',
-              'continuous morph', 'continuous no morph', ], frameon=False, loc='upper center',
-          bbox_to_anchor=(0.5, -.1), ncol=2)
+ax.legend(h, ['classification with sampled fashion MNIST', 'classification with sequence data',
+              'continuous morph', 'continuous no morph', ], frameon=False, loc='center left',
+          bbox_to_anchor=(1, 0.5), ncol=1, fontsize=12)
 plt.tight_layout()
 
 plt.show()
@@ -122,7 +137,7 @@ fig3 = rdm_w_rep(np.vstack(
         'r_out'].to_numpy()),
     still_rep_stillcontrol[still_rep_stillcontrol['is_train'] == isTrain][still_rep_stillcontrol['layer'] == 3][
         'labels'].to_numpy(),
-    'cosine', ticklabel=160, title='still control test reps')
+    'cosine', ticklabel=160, title='still control top area latent representations (train)')
 plt.show()
 plt.close()
 
@@ -257,7 +272,7 @@ df_genacc_conti = pd.concat([df_genacc_conti1, df_genacc_conti2, df_genacc_conti
 
 # %%
 # 1. decoding acc
-fig, ax = plt.subplots(figsize=(6, 5))
+fig, ax = plt.subplots(figsize=(9, 5))
 sns.despine()
 sns.barplot(data=df_genacc_conti[df_genacc_conti['accIsTest'] == 1][df_genacc_conti['layer'] != 0], x='layer', y='acc', hue='conti_disconti', ax=ax,
             palette='tab10')
@@ -267,13 +282,13 @@ sns.barplot(data=df_genacc_conti[df_genacc_conti['accIsTest'] == 1][df_genacc_co
 # add baseline classification on input
 plt.axhline(y=0.8894, linestyle='dotted', color='black', label='classification with frames')
 plt.xlabel('area')
+plt.ylabel('accuracy')
 h, _ = ax.get_legend_handles_labels()
 ax.legend(h, ['classification with seq data', 'continuous (large rotation)', 'continuous (small rotation)',
-              'discontinuous (large rotation)'], frameon=False, loc='upper center',
-          bbox_to_anchor=(0.5, -.1), ncol=2)
+              'discontinuous (large rotation)'], frameon=False, loc='center left',
+          bbox_to_anchor=(1, 0.5), ncol=1, fontsize=12)
 plt.tight_layout()
 
-plt.tight_layout()
 plt.show()
 plt.close()
 
@@ -318,22 +333,22 @@ reps = reps[idx]
 pair_dist_cosine = pairwise_distances(reps[:9], metric='cosine')
 # %%
 # plot rdm of frame and rep side by side
-fig, axs = plt.subplots(1, 3, figsize=(14, 4))
-cbar_ax = fig.add_axes([.91, .3, .03, .4])
+fig, axs = plt.subplots(1, 3, figsize=(12, 4.4), gridspec_kw={'width_ratios': [1, 1, 1.2]})
+# cbar_ax = fig.add_axes([.91, .3, .03, .4])
+# cbar_ax.set_in_layout(False)
 sns.heatmap(pair_dist_cosine_frame, xticklabels=1, yticklabels=1, ax=axs[0], cmap='viridis', vmin=0, vmax=.8,
-            cbar_ax=cbar_ax)
+            cbar=False)
 axs[0].set_title('frames')
 axs[0].set_xlabel('mean cosine distance = %.3f' % (np.mean(pair_dist_cosine_frame)))
 sns.heatmap(pair_dist_cosine_rep_contimorph, xticklabels=1, yticklabels=1, ax=axs[1], cmap='viridis', vmin=0, vmax=.8,
-            cbar_ax=cbar_ax)
-axs[1].set_title('reps (continuous morph)')
+            cbar=False)
+axs[1].set_title('latent representations \n (continuous morph)')
 axs[1].set_xlabel('mean cosine distance = %.3f' % (np.mean(pair_dist_cosine_rep_contimorph)))
 sns.heatmap(pair_dist_cosine, xticklabels=1, yticklabels=1, ax=axs[2], cmap='viridis', vmin=0, vmax=.8,
-            cbar_ax=cbar_ax)
-axs[2].set_title('reps (discontinuous morph)')
+            cbar=True, cbar_kws={'label': 'cosine distance'})
+axs[2].set_title('latent representations \n (discontinuous morph)')
 axs[2].set_xlabel('mean cosine distance = %.3f' % (np.mean(pair_dist_cosine)))
-
-# plt.tight_layout()
+plt.tight_layout()
 plt.show()
 
 # %%
@@ -372,16 +387,19 @@ df_genacc_stillcontivsdiconti = generate_acc_df([still_rep_stillcontrol, still_r
 
 # %%
 # plot
-fig, ax = plt.subplots(figsize=(6, 5))
+fig, ax = plt.subplots(figsize=(9, 5))
 sns.despine()
 sns.barplot(data=df_genacc_stillcontivsdiconti[df_genacc_stillcontivsdiconti['accIsTest'] == 1][df_genacc_stillcontivsdiconti['layer'] != 0], x='layer', y='acc', hue='condition', ax=ax,
             palette='tab10')
 # ax.set_title('generalisation acc by layer still img')
 plt.axhline(y=.455, linestyle='dashed', color='black', label='linear classification with still data')
+plt.xlabel('area')
+plt.ylabel('accuracy')
 
 h, _ = ax.get_legend_handles_labels()
-ax.legend(h, ['classification with sampled fashion MNIST', 'still control', 'continuous morph', 'discontinuous morph', 'continuous no morph'], frameon=False, loc='upper center',
-          bbox_to_anchor=(0.5, -.1), ncol=2)
+ax.legend(h, ['classification with sampled \n fashion MNIST', 'still control', 'continuous morph', 'discontinuous morph', 'continuous no morph'],
+          frameon=False, loc='center left',
+          bbox_to_anchor=(1, 0.5), ncol=1, fontsize=12)
 
 plt.tight_layout()
 plt.show()
@@ -399,7 +417,7 @@ for i, ax in enumerate(fig.axes):
 plt.show()
 
 # %%
-# plot gen acc and generalisation
+# plot gen acc and dataset size
 corr_train_log = glob(os.path.join(filedir, 'correlation/**/trained_model/*metrics_log.pkl'))
 
 # %%
@@ -432,5 +450,6 @@ plt.show()
 # %%
 fig, ax = plt.subplots(figsize=(6, 5))
 sns.despine()
-sns.barplot(data=df_corr_gen[df_corr_gen['epoch']==40], x='samples per class', y='acc', palette='tab10', ci='sd')
+sns.barplot(data=df_corr_gen[df_corr_gen['epoch']==40], x='samples per class', y='acc',
+            palette='tab10', ci='sd')
 plt.show()

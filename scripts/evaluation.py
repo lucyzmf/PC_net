@@ -208,7 +208,8 @@ def rdm_w_rep(representations, labels, metric_type, ticklabel, title):  # inputs
     pair_dist_cosine = pairwise_distances(representations, metric=metric_type)
 
     fig, ax = plt.subplots()
-    sns.heatmap(pair_dist_cosine, xticklabels=ticklabel, yticklabels=ticklabel, ax=ax, cmap='viridis')
+    sns.heatmap(pair_dist_cosine, xticklabels=ticklabel, yticklabels=ticklabel, ax=ax, cmap='viridis',
+                cbar_kws={'label': 'cosine distance'})
     # fig.colorbar(im, ax=ax)
     ax.set_title(title)
     # plt.show()

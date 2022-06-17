@@ -453,3 +453,30 @@ sns.despine()
 sns.barplot(data=df_corr_gen[df_corr_gen['epoch']==40], x='samples per class', y='acc',
             palette='tab10', ci='sd')
 plt.show()
+
+# %%
+# reconstruction
+train_data = torch.load('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_10/trainesize160perclass/fashionMNISTtrain_image.pt')
+img, label = train_data[0]
+
+# %%
+from fc_net import *
+CONFIG_PATH = "../scripts/"
+
+# %%
+def load_config(config_name):
+    with open(os.path.join(CONFIG_PATH, config_name)) as file:
+        config = yaml.safe_load(file)
+    return config
+
+trained_still_network = FcDHPC([1936, 2500, 800, 100], [.07, .07, .05, .05], lr=.001, act_func=config['act_func'], device='cpu', dtype=torch.float)
+trained_still_network.load_state_dict(torch.load('/Users/lucyzhang/Documents/research/PC_net/results/morph_test_10/still_control/trained_model/spin[1936, 2500, 800, 100][0.07, 0.07, 0.05, 0.05]Falsel2_0.0110.0end_trainingreadout.pth', map_location=torch.device('cpu')))
+
+# %%
+_, fig = trained_still_network.reconstruct(img, torch.tensor(label), 250)
+plt.show()
+
+# %%
+sns.despine()
+sns.heatmap(torch.squeeze(img), cmap='viridis', cbar_kws={'label': 'pixel value'})
+plt.show()

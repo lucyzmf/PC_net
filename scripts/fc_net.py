@@ -5,6 +5,7 @@
 import os
 
 import numpy as np
+import seaborn as sns
 import torch
 import yaml
 from matplotlib import pyplot as plt
@@ -219,8 +220,8 @@ class FcDHPC(nn.Module):
         img_width = int(np.sqrt(len(reconstructed_frame)))
 
         fig, ax = plt.subplots()
-        im = ax.imshow(np.reshape(reconstructed_frame, (img_width, img_width)))
-        ax.set_title('reconstruction digit %i error %f' % (label, error.item()))
+        sns.heatmap(np.reshape(reconstructed_frame, (img_width, img_width)), cmap='viridis', cbar_kws={'label': 'reconstruction'})
+        # ax.set_title('reconstruction error %f' % (error.item()))
         # plt.show()
 
         return error, fig
